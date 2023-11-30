@@ -10,7 +10,7 @@ import utils
 import hydra
 
 
-class SACAgent(Agent):
+class SACAgent(Agent, nn.Module):
     """SAC algorithm."""
     def __init__(self, obs_dim, action_dim, action_range, device, critic_cfg,
                  actor_cfg, discount, init_temperature, alpha_lr, alpha_betas,

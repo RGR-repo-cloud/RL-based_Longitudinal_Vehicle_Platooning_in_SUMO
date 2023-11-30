@@ -2,3 +2,5 @@ __pycache__/
 .ipynb_checkpoints/
 exp
 tb
+experiments
+conda_env.yml

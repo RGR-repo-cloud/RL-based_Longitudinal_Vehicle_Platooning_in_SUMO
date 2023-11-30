@@ -6,22 +6,22 @@ env: cheetah_run
 # this needs to be specified manually
 experiment: test_exp
 
-num_train_steps: 1e6
+num_train_steps: 12000
 replay_buffer_capacity: ${num_train_steps}
 
-num_seed_steps: 5000
+num_seed_steps: 600
 
-eval_frequency: 10000
-num_eval_episodes: 10
+eval_frequency: 100000
+num_eval_episodes: 1
 
 device: cuda
 
 # logger
-log_frequency: 10000
+log_frequency: 600
 log_save_tb: true
 
 # video recorder
-save_video: true
+save_video: false
 
 
 seed: 1

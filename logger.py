@@ -48,12 +48,13 @@ class AverageMeter(object):
 
 
 class MetersGroup(object):
-    def __init__(self, file_name, formating):
+    def __init__(self, file_name, formating, agent_id):
         self._csv_file_name = self._prepare_file(file_name, 'csv')
         self._formating = formating
         self._meters = defaultdict(AverageMeter)
         self._csv_file = open(self._csv_file_name, 'w')
         self._csv_writer = None
+        self.agent_id = agent_id
 
     def _prepare_file(self, prefix, suffix):
         file_name = f'{prefix}.{suffix}'
@@ -101,6 +102,7 @@ class MetersGroup(object):
         for key, disp_key, ty in self._formating:
             value = data.get(key, 0)
             pieces.append(self._format(disp_key, value, ty))
+        print('AGENT_ID: ' + self.agent_id)
         print(' | '.join(pieces))
 
     def dump(self, step, prefix, save=True):
@@ -117,6 +119,7 @@ class MetersGroup(object):
 class Logger(object):
     def __init__(self,
                  log_dir,
+                 agent_id,
                  save_tb=False,
                  log_frequency=10000,
                  agent='sac'):
@@ -136,10 +139,10 @@ class Logger(object):
         # each agent has specific output format for training
         assert agent in AGENT_TRAIN_FORMAT
         train_format = COMMON_TRAIN_FORMAT + AGENT_TRAIN_FORMAT[agent]
-        self._train_mg = MetersGroup(os.path.join(log_dir, 'train'),
-                                     formating=train_format)
-        self._eval_mg = MetersGroup(os.path.join(log_dir, 'eval'),
-                                    formating=COMMON_EVAL_FORMAT)
+        self._train_mg = MetersGroup(os.path.join(log_dir, ('train_' + agent_id)),
+                                     formating=train_format, agent_id=agent_id)
+        self._eval_mg = MetersGroup(os.path.join(log_dir, ('eval_' + agent_id)),
+                                    formating=COMMON_EVAL_FORMAT, agent_id=agent_id)
 
     def _should_log(self, step, log_frequency):
         log_frequency = log_frequency or self._log_frequency

@@ -14,9 +14,8 @@ from video import VideoRecorder
 from logger import Logger
 from replay_buffer import ReplayBuffer
 import utils
-
-import dmc2gym
 import hydra
+from agent_system import MultiAgent
 
 
 def make_env(cfg):
@@ -46,103 +45,124 @@ class Workspace(object):
 
         self.cfg = cfg
 
-        self.logger = Logger(self.work_dir,
-                             save_tb=cfg.log_save_tb,
-                             log_frequency=cfg.log_frequency,
-                             agent=cfg.agent.name)
-
         utils.set_seed_everywhere(cfg.seed)
         self.device = torch.device(cfg.device)
-        self.env = utils.make_env(cfg)
+        
+        #register environment
+        self.env = utils.import_flow_env("multi_lane_highway", False, False) #quick fix
+        self.env.seed(cfg.seed)
+        self.agent_ids = self.env.agents
 
-        cfg.agent.params.obs_dim = self.env.observation_space.shape[0]
-        cfg.agent.params.action_dim = self.env.action_space.shape[0]
-        cfg.agent.params.action_range = [
-            float(self.env.action_space.low.min()),
-            float(self.env.action_space.high.max())
-        ]
-        self.agent = hydra.utils.instantiate(cfg.agent)
+        #initialize loggers
+        self.loggers = {}
+        for agent in self.agent_ids:
+            self.loggers[agent] = Logger(   self.work_dir,
+                                            agent_id=agent,
+                                            save_tb=cfg.log_save_tb,
+                                            log_frequency=cfg.log_frequency,
+                                            agent=cfg.agent.name)
+        
+        #initialize input and output parameters
+        obs_spaces, act_spaces, act_ranges = {}, {}, {}
+        for agent in self.agent_ids:
+            obs_spaces[agent] = self.env.observation_space[agent].shape
+            act_spaces[agent] = self.env.action_space[agent].shape
+            act_ranges[agent] = [  float(self.env.action_space[agent].low.min()),
+                                    float(self.env.action_space[agent].high.max())]
 
-        self.replay_buffer = ReplayBuffer(self.env.observation_space.shape,
-                                          self.env.action_space.shape,
-                                          int(cfg.replay_buffer_capacity),
-                                          self.device)
-
+        #initialize agents
+        self.agents = MultiAgent(cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(cfg.replay_buffer_capacity), self.device)
+            
         self.video_recorder = VideoRecorder(
             self.work_dir if cfg.save_video else None)
         self.step = 0
 
+
     def evaluate(self):
-        average_episode_reward = 0
+        average_episode_rewards = {}
+        for agent in self.agent_ids:
+            average_episode_rewards[agent] = 0
         for episode in range(self.cfg.num_eval_episodes):
             obs = self.env.reset()
-            self.agent.reset()
+            self.agents.reset_all()
             self.video_recorder.init(enabled=(episode == 0))
             done = False
-            episode_reward = 0
+            episode_rewards = {}
+            for agent in self.agent_ids:
+                    episode_rewards[agent] = 0
             while not done:
-                with utils.eval_mode(self.agent):
-                    action = self.agent.act(obs, sample=False)
-                obs, reward, done, _ = self.env.step(action)
+                actions = self.agents.act_all(obs, sample=False, mode="eval")
+                obs, rewards, done, _ = self.env.step(actions)
                 self.video_recorder.record(self.env)
-                episode_reward += reward
+                for agent in self.agent_ids:
+                    episode_rewards[agent] += rewards[agent]
 
-            average_episode_reward += episode_reward
+            for agent in self.agent_ids:
+                average_episode_rewards[agent] += episode_rewards[agent]
             self.video_recorder.save(f'{self.step}.mp4')
-        average_episode_reward /= self.cfg.num_eval_episodes
-        self.logger.log('eval/episode_reward', average_episode_reward,
+        for agent in self.agent_ids:
+            average_episode_rewards[agent] /= self.cfg.num_eval_episodes
+            self.loggers[agent].log('eval/episode_reward', average_episode_rewards[agent],
                         self.step)
-        self.logger.dump(self.step)
+            self.loggers[agent].dump(self.step)
 
     def run(self):
-        episode, episode_reward, done = 0, 0, True
+        episode, episode_rewards, done = 0, {}, True
+        for agent in self.agent_ids:
+            episode_rewards[agent] = 0
         start_time = time.time()
+        
         while self.step < self.cfg.num_train_steps:
             if done:
                 if self.step > 0:
-                    self.logger.log('train/duration',
-                                    time.time() - start_time, self.step)
-                    start_time = time.time()
-                    self.logger.dump(
-                        self.step, save=(self.step > self.cfg.num_seed_steps))
+                    for agent in self.agent_ids:
+                        self.loggers[agent].log('train/duration',
+                                            time.time() - start_time, self.step)
+                        start_time = time.time()
+                        self.loggers[agent].dump(
+                                            self.step, save=(self.step > self.cfg.num_seed_steps))
 
                 # evaluate agent periodically
                 if self.step > 0 and self.step % self.cfg.eval_frequency == 0:
-                    self.logger.log('eval/episode', episode, self.step)
+                    for agent in self.agent_ids:
+                        self.loggers[agent].log('eval/episode', episode, self.step)
                     self.evaluate()
 
-                self.logger.log('train/episode_reward', episode_reward,
-                                self.step)
+                for agent in self.agent_ids:
+                    self.loggers[agent].log('train/episode_reward', episode_rewards[agent],
+                                           self.step) 
 
                 obs = self.env.reset()
-                self.agent.reset()
+                self.agents.reset_all()
                 done = False
-                episode_reward = 0
+                for agent in self.agent_ids:
+                    episode_rewards[agent] = 0
                 episode_step = 0
                 episode += 1
 
-                self.logger.log('train/episode', episode, self.step)
+                for agent in self.agent_ids:
+                    self.loggers[agent].log('train/episode', episode, self.step)
 
             # sample action for data collection
             if self.step < self.cfg.num_seed_steps:
-                action = self.env.action_space.sample()
+                actions = {}
+                for agent in self.agent_ids:
+                    actions[agent] = self.env.action_space[agent].sample()
             else:
-                with utils.eval_mode(self.agent):
-                    action = self.agent.act(obs, sample=True)
+                actions = self.agents.act_all(obs, sample=False, mode="eval")
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:
-                self.agent.update(self.replay_buffer, self.logger, self.step)
+                self.agents.update_all(self.loggers, self.step)
 
-            next_obs, reward, done, _ = self.env.step(action)
+            next_obs, rewards, done, _ = self.env.step(actions)
 
             # allow infinite bootstrap
             done = float(done)
-            done_no_max = 0 if episode_step + 1 == self.env._max_episode_steps else done
-            episode_reward += reward
-
-            self.replay_buffer.add(obs, action, reward, next_obs, done,
-                                   done_no_max)
+            done_no_max = 0 if episode_step + 1 == self.env.horizon else done
+            for agent in self.agent_ids:
+                episode_rewards[agent] += rewards[agent]
+            self.agents.add_to_buffers(obs, actions, rewards, next_obs, done, done_no_max)
 
             obs = next_obs
             episode_step += 1

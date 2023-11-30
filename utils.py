@@ -11,6 +11,129 @@ import math
 
 import dmc2gym
 
+import flow.config as config
+import sys
+from gym.spaces import Box
+from copy import deepcopy
+from flow.utils.registry import make_create_env
+
+def import_flow_env(env_name, render, evaluate):
+    
+     # Add flow/examples to your path to located the below modules.
+    sys.path.append(os.path.join(config.PROJECT_PATH, "examples"))
+
+    # Import relevant information from the exp_config script.
+    module = __import__("exp_configs.rl.singleagent", fromlist=[env_name])
+    module_ma = __import__("exp_configs.rl.multiagent", fromlist=[env_name])
+
+    # Import the sub-module containing the specified exp_config and determine
+    # whether the environment is single agent or multi-agent.
+    if hasattr(module, env_name):
+        submodule = getattr(module, env_name)
+        multiagent = False
+    elif hasattr(module_ma, env_name):
+        submodule = getattr(module_ma, env_name)
+        multiagent = True
+    else:
+        raise ValueError("Unable to find experiment config.")
+
+    # Collect the flow_params object.
+    flow_params = deepcopy(submodule.flow_params)
+
+    # Update the evaluation flag to match what is requested.
+    flow_params['env'].evaluate = evaluate
+
+    # Return the environment.
+    return FlowEnv(
+        flow_params,
+        multiagent=multiagent,
+        render=render,
+    )
+
+
+class FlowEnv(gym.Env):
+
+    def __init__(self,
+                 flow_params,
+                 multiagent=False,
+                 shared=False,
+                 maddpg=False,
+                 render=False,
+                 version=0):
+        
+        # Initialize some variables.
+        self.multiagent = multiagent
+        self.shared = shared
+        self.maddpg = maddpg
+
+
+        # Create the wrapped environment.
+        create_env, _ = make_create_env(flow_params, version, render)
+        self.wrapped_env = create_env()
+
+        # Collect the IDs of individual vehicles if using a multi-agent env.
+        if self.multiagent:
+            self.agents = list(self.wrapped_env.reset().keys())
+
+        # for tracking the time horizon
+        self.step_number = 0
+        self.horizon = self.wrapped_env.env_params.horizon
+
+    @property
+    def action_space(self):
+        """See wrapped environment."""
+        if self.multiagent and not self.shared:
+            return {key: self.wrapped_env.action_space for key in self.agents}
+        else:
+            return self.wrapped_env.action_space
+
+    @property
+    def observation_space(self):
+        """See wrapped environment."""
+        if self.multiagent and not self.shared:
+            return {
+                key: self.wrapped_env.observation_space for key in self.agents}
+        else:
+            return self.wrapped_env.observation_space
+
+    def step(self, action):
+        """See wrapped environment.
+
+        The done term is also modified in case the time horizon is met.
+        """
+        obs, reward, done, info_dict = self.wrapped_env.step(action)
+
+        # Check if the time horizon has been met.
+        self.step_number += 1
+        if isinstance(done, dict):
+            done = {key: done[key] or self.step_number == self.horizon
+                    for key in obs.keys()}
+            done["__all__"] = all(done.values())
+        else:
+            done = done or self.step_number == self.horizon
+
+        return obs, reward, done["__all__"], info_dict  ########################quick fix
+
+    def reset(self):
+        """Reset the environment."""
+        self.step_number = 0
+
+        obs = self.wrapped_env.reset()
+
+        return obs
+
+
+    def render(self, mode='human'):
+        """Do nothing."""
+        pass
+
+    def query_expert(self, obs):
+        if hasattr(self.wrapped_env, "query_expert"):
+            return self.wrapped_env.query_expert(obs)
+        else:
+            raise ValueError("Environment does not have a query_expert method")
+
+
 
 def make_env(cfg):
     """Helper function to create dm_control environment"""
