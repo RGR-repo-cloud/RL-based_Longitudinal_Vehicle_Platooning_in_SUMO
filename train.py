@@ -49,7 +49,7 @@ class Workspace(object):
         self.device = torch.device(cfg.device)
         
         #register environment
-        self.env = utils.import_flow_env("multi_lane_highway", False, False) #quick fix
+        self.env = utils.import_flow_env("multi_lane_highway_5V", False, False) #quick fix
         self.env.seed(cfg.seed)
         self.agent_ids = self.env.agents
 
