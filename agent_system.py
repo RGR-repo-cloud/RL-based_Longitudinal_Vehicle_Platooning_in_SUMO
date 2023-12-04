@@ -2,6 +2,7 @@ from replay_buffer import ReplayBuffer
 import hydra
 import utils
 import torch
+import time
 
 
 class MultiAgent:
@@ -85,49 +86,50 @@ class MultiAgent:
             loggers[agent].log('train/batch_reward', rewards[agent].mean(), step)
 
         #update critics
-        critics_loss = {}
+        critics_loss = 0
         for agent in self.agent_ids:
-            critics_loss[agent] = self.agents[agent].update_critic( obs[agent],
-                                                                   actions[agent],
-                                                                   rewards[agent],
-                                                                   next_obs[agent],
-                                                                   not_done[agent],
-                                                                   loggers[agent],
-                                                                   step)
-        
-        self.critics_optimizer.zero_grad()
-        for agent in self.agent_ids:
-            critics_loss[agent].backward()
-        self.critics_optimizer.step()
-
-        for agent in self.agent_ids:
+            critics_loss += self.agents[agent].update_critic(   obs[agent],
+                                                                actions[agent],
+                                                                rewards[agent],
+                                                                next_obs[agent],
+                                                                not_done[agent],
+                                                                loggers[agent],
+                                                                step)
             self.agents[agent].critic.log(loggers[agent], step)
+        
+            
 
 
         #update actors and alphas
+        actors_loss = 0
+        alphas_loss = 0
         if step % self.agents[self.agent_ids[0]].actor_update_frequency == 0: #quick fix
-            actors_loss, log_probs = {}, {}
+            log_probs = {}
+            
             for agent in self.agent_ids:
-                actors_loss[agent], log_probs[agent] = self.agents[agent].update_actor( obs[agent],
-                                                                                        loggers[agent],
-                                                                                        step)
-            self.actors_optimizer.zero_grad()
-            for agent in self.agent_ids:
-                actors_loss[agent].backward()
-            self.actors_optimizer.step()
-
-            for agent in self.agent_ids:
+                actor_loss, log_probs[agent] = self.agents[agent].update_actor( obs[agent],
+                                                                                loggers[agent],
+                                                                                step)
+                actors_loss += actor_loss
                 self.agents[agent].actor.log(loggers[agent], step)
-
-            if self.agents[self.agent_ids[0]].learnable_temperature: #quick fix
-                alphas_loss = {}
-                for agent in self.agent_ids:
-                    alphas_loss[agent] = self.agents[agent].update_alpha(loggers[agent], step, log_probs[agent])
                 
-                self.log_alphas_optimizer.zero_grad()
+            if self.agents[self.agent_ids[0]].learnable_temperature: #quick fix
                 for agent in self.agent_ids:
-                    alphas_loss[agent].backward()
-                self.log_alphas_optimizer.step()
+                    alphas_loss += self.agents[agent].update_alpha(loggers[agent], step, log_probs[agent])
+    
+        
+        loss = critics_loss + actors_loss + alphas_loss
+
+        self.critics_optimizer.zero_grad()
+        self.actors_optimizer.zero_grad()
+        self.log_alphas_optimizer.zero_grad()
+        
+        loss.backward()
+
+        self.critics_optimizer.step()
+        self.actors_optimizer.step()
+        self.log_alphas_optimizer.step()
+
 
 
         #update targets
