@@ -149,7 +149,7 @@ class Workspace(object):
                 for agent in self.agent_ids:
                     actions[agent] = self.env.action_space[agent].sample()
             else:
-                actions = self.agents.act_all(obs, sample=False, mode="eval")
+                actions = self.agents.act_all(obs, sample=True, mode="eval")
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:
