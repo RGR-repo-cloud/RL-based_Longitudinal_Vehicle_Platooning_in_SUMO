@@ -48,18 +48,21 @@ class AverageMeter(object):
 
 
 class MetersGroup(object):
-    def __init__(self, file_name, formating, agent_id):
+    def __init__(self, file_name, formating, agent_id, file_exists):
         self._csv_file_name = self._prepare_file(file_name, 'csv')
         self._formating = formating
         self._meters = defaultdict(AverageMeter)
-        self._csv_file = open(self._csv_file_name, 'w')
+        if not file_exists:
+            self._csv_file = open(self._csv_file_name, 'w')
+        else:
+            self._csv_file = open(self._csv_file_name, 'a')
         self._csv_writer = None
         self.agent_id = agent_id
 
     def _prepare_file(self, prefix, suffix):
         file_name = f'{prefix}.{suffix}'
-        if os.path.exists(file_name):
-            os.remove(file_name)
+        #if os.path.exists(file_name):
+        #    os.remove(file_name)
         return file_name
 
     def log(self, key, value, n=1):
@@ -122,7 +125,8 @@ class Logger(object):
                  agent_id,
                  save_tb=False,
                  log_frequency=10000,
-                 agent='sac'):
+                 agent='sac',
+                 file_exists=False):
         self._log_dir = log_dir
         self._log_frequency = log_frequency
         if save_tb:
@@ -140,9 +144,9 @@ class Logger(object):
         assert agent in AGENT_TRAIN_FORMAT
         train_format = COMMON_TRAIN_FORMAT + AGENT_TRAIN_FORMAT[agent]
         self._train_mg = MetersGroup(os.path.join(log_dir, ('train_' + agent_id)),
-                                     formating=train_format, agent_id=agent_id)
+                                     formating=train_format, agent_id=agent_id, file_exists=file_exists)
         self._eval_mg = MetersGroup(os.path.join(log_dir, ('eval_' + agent_id)),
-                                    formating=COMMON_EVAL_FORMAT, agent_id=agent_id)
+                                    formating=COMMON_EVAL_FORMAT, agent_id=agent_id, file_exists=file_exists)
 
     def _should_log(self, step, log_frequency):
         log_frequency = log_frequency or self._log_frequency

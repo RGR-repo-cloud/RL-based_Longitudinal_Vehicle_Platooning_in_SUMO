@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+import torch
 from replay_buffer import ReplayBuffer
 import hydra
 from torch.nn import ModuleDict
@@ -71,3 +74,40 @@ class MultiAgent:
 
         for agent in self.agent_ids:
             self.replay_buffers[agent].add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, done_no_max)
+
+
+    def load_checkpoint(self, dir):
+
+        checkpoint = torch.load(dir)
+        self.agents.load_state_dict(checkpoint['models'])
+        
+        #for param_tensor in self.agents.state_dict():
+         #   print(param_tensor, "\t", self.agents.state_dict()[param_tensor].size())
+
+        for agent in self.agent_ids:
+            self.agents[agent].critic_optimizer.load_state_dict(checkpoint['optims'][agent]['critic'])
+            self.agents[agent].actor_optimizer.load_state_dict(checkpoint['optims'][agent]['actor'])
+            self.agents[agent].log_alpha_optimizer.load_state_dict(checkpoint['optims'][agent]['alpha'])
+            self.agents[agent].log_alpha = checkpoint['log_alpha'][agent]
+
+        return checkpoint['step']
+    
+
+    def save_checkpoint(self, dir, step):
+        
+        Path(dir).mkdir(parents=True, exist_ok=True)
+            
+        state = {}
+        state['step'] = step
+        state['models'] = self.agents.state_dict()
+        state['log_alpha'] = {}
+        state['optims'] = {}
+        
+        for agent in self.agent_ids:
+            state['optims'][agent] = {}
+            state['optims'][agent]['critic'] = self.agents[agent].critic_optimizer.state_dict()
+            state['optims'][agent]['actor'] = self.agents[agent].actor_optimizer.state_dict()
+            state['optims'][agent]['alpha'] = self.agents[agent].log_alpha_optimizer.state_dict()
+            state['log_alpha'][agent] = self.agents[agent].log_alpha
+
+        torch.save(state, os.path.join(dir, 'checkpoint-{:d}.pt'.format(step)))

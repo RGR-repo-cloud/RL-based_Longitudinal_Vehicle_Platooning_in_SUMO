@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import datetime
+from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
@@ -40,6 +42,15 @@ def make_env(cfg):
 
 class Workspace(object):
     def __init__(self, cfg):
+
+        #change working directory to location of checkpoint or create new one
+        if cfg.load_checkpoint:
+            os.chdir(os.path.join(os.getcwd(), cfg.checkpoint_dir))
+        else:
+            dir = os.path.join(os.getcwd(), datetime.datetime.now().strftime('%Y-%m-%d'), datetime.datetime.now().strftime('%H-%M'))
+            Path(dir).mkdir(parents=True, exist_ok=True)
+            os.chdir(dir)
+            
         self.work_dir = os.getcwd()
         print(f'workspace: {self.work_dir}')
 
@@ -49,7 +60,7 @@ class Workspace(object):
         self.device = torch.device(cfg.device)
         
         #register environment
-        self.env = utils.import_flow_env("multi_lane_highway", False, False) #quick fix
+        self.env = utils.import_flow_env(cfg.env, False, False) #quick fix
         self.env.seed(cfg.seed)
         self.agent_ids = self.env.agents
 
@@ -60,22 +71,30 @@ class Workspace(object):
                                             agent_id=agent,
                                             save_tb=cfg.log_save_tb,
                                             log_frequency=cfg.log_frequency,
-                                            agent=cfg.agent.name)
+                                            agent=cfg.agent.name,
+                                            file_exists=cfg.load_checkpoint)
         
         #initialize input and output parameters
         obs_spaces, act_spaces, act_ranges = {}, {}, {}
         for agent in self.agent_ids:
             obs_spaces[agent] = self.env.observation_space[agent].shape
             act_spaces[agent] = self.env.action_space[agent].shape
-            act_ranges[agent] = [  float(self.env.action_space[agent].low.min()),
+            act_ranges[agent] = [   float(self.env.action_space[agent].low.min()),
                                     float(self.env.action_space[agent].high.max())]
 
         #initialize agents
         self.agents = MultiAgent(cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(cfg.replay_buffer_capacity), self.device)
-            
+
+        self.step = 0
+        
+        #load checkpoint
+        if cfg.load_checkpoint:
+            self.step = self.agents.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints', self.cfg.checkpoint_name))
+
+
         self.video_recorder = VideoRecorder(
             self.work_dir if cfg.save_video else None)
-        self.step = 0
+        
 
 
     def evaluate(self):
@@ -144,12 +163,12 @@ class Workspace(object):
                     self.loggers[agent].log('train/episode', episode, self.step)
 
             # sample action for data collection
-            if self.step < self.cfg.num_seed_steps:
+            if self.step < self.cfg.num_seed_steps and not self.cfg.load_checkpoint:
                 actions = {}
                 for agent in self.agent_ids:
                     actions[agent] = self.env.action_space[agent].sample()
             else:
-                actions = self.agents.act_all(obs, sample=False, mode="eval")
+                actions = self.agents.act_all(obs, sample=True, mode="eval")
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:
@@ -168,11 +187,22 @@ class Workspace(object):
             episode_step += 1
             self.step += 1
 
+        
+        #save models and optimizers
+        if self.cfg.save_checkpoint:
+            self.agents.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step)
+            
+
+            
+
+
+
 
 @hydra.main(config_path='config/train.yaml', strict=True)
 def main(cfg):
     workspace = Workspace(cfg)
     workspace.run()
+    workspace.evaluate()
 
 
 if __name__ == '__main__':
