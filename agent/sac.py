@@ -31,12 +31,12 @@ class SACAgent(Agent, nn.Module):
         self.critic = hydra.utils.instantiate(critic_cfg).to(self.device)
         self.critic_target = hydra.utils.instantiate(critic_cfg).to(
             self.device)
-        self.critic_target.load_state_dict(self.critic.state_dict())
+        self.critic_target.load_state_dict(self.critic.state_dict()) ########################################################MAYBE AFTER LOADING CHECKPOINT?
 
         self.actor = hydra.utils.instantiate(actor_cfg).to(self.device)
 
         self.log_alpha = torch.tensor(np.log(init_temperature)).to(self.device)
-        self.log_alpha.requires_grad = True
+        self.log_alpha.requires_grad = True                                         #################################check order of loading and instantiating!!!!!!!!!!!!!!!!!!!!!
         # set target entropy to -|A|
         self.target_entropy = -action_dim
 

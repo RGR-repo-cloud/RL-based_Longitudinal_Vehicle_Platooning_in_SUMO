@@ -5,11 +5,12 @@ from replay_buffer import ReplayBuffer
 import hydra
 from torch.nn import ModuleDict
 import utils
+import numpy as np
 
 
 class MultiAgent:
 
-    def __init__(self, cfg, agent_ids, obs_spaces, act_spaces, act_ranges, replay_buffer_caps, device):
+    def __init__(self, cfg, agent_ids, obs_spaces, act_spaces, act_ranges, replay_buffer_cap, device):
 
         self.agent_ids = agent_ids
         self.device = device
@@ -27,7 +28,7 @@ class MultiAgent:
             agents[agent] = hydra.utils.instantiate(cfg.agent)
             self.replay_buffers[agent] = ReplayBuffer(  obs_spaces[agent],
                                                         act_spaces[agent],
-                                                        replay_buffer_caps,
+                                                        replay_buffer_cap,
                                                         self.device)
         
         self.agents = ModuleDict(agents)
@@ -78,25 +79,51 @@ class MultiAgent:
 
     def load_checkpoint(self, dir):
 
-        checkpoint = torch.load(dir)
-        self.agents.load_state_dict(checkpoint['models'])
-        
-        #for param_tensor in self.agents.state_dict():
-         #   print(param_tensor, "\t", self.agents.state_dict()[param_tensor].size())
+        #load model parameters
+        model_checkpoint = torch.load(os.path.join(dir, 'checkpoint.pt'))
+        self.agents.load_state_dict(model_checkpoint['models'])
+        step = model_checkpoint['step']
+      
+        for agent in self.agent_ids:
+            self.agents[agent].critic_optimizer.load_state_dict(model_checkpoint['optims'][agent]['critic'])
+            self.agents[agent].actor_optimizer.load_state_dict(model_checkpoint['optims'][agent]['actor'])
+            self.agents[agent].log_alpha_optimizer.load_state_dict(model_checkpoint['optims'][agent]['alpha'])
+            self.agents[agent].log_alpha = model_checkpoint['log_alpha'][agent]
+
+        #load replay buffer entries
+        rep_dir = os.path.join(dir, 'replay_buffers')
 
         for agent in self.agent_ids:
-            self.agents[agent].critic_optimizer.load_state_dict(checkpoint['optims'][agent]['critic'])
-            self.agents[agent].actor_optimizer.load_state_dict(checkpoint['optims'][agent]['actor'])
-            self.agents[agent].log_alpha_optimizer.load_state_dict(checkpoint['optims'][agent]['alpha'])
-            self.agents[agent].log_alpha = checkpoint['log_alpha'][agent]
+            data = np.load(os.path.join(rep_dir, agent + '.npz'))
+            
+            for i in range(step):
 
-        return checkpoint['step']
+                obs = data['obses'][i]
+                next_obs = data['next_obses'][i]
+                action = data['actions'][i]
+                reward = data['rewards'][i]
+                not_done = data['not_dones'][i]
+                not_done_no_max = data['not_dones_no_max'][i]
+
+                self.replay_buffers[agent].add(obs=obs,
+                                               action=action,
+                                               reward=reward,
+                                               next_obs=next_obs,
+                                               done=not not_done,
+                                               done_no_max=not not_done_no_max)
+            
+            data.close()
+        
+
+        return step
     
 
     def save_checkpoint(self, dir, step):
         
-        Path(dir).mkdir(parents=True, exist_ok=True)
+        checkpoint_dir = os.path.join(dir, 'cp_{:d}'.format(step))
+        Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)
             
+        #save model parameters
         state = {}
         state['step'] = step
         state['models'] = self.agents.state_dict()
@@ -110,4 +137,38 @@ class MultiAgent:
             state['optims'][agent]['alpha'] = self.agents[agent].log_alpha_optimizer.state_dict()
             state['log_alpha'][agent] = self.agents[agent].log_alpha
 
-        torch.save(state, os.path.join(dir, 'checkpoint-{:d}.pt'.format(step)))
+        torch.save(state, os.path.join(checkpoint_dir, 'checkpoint.pt'))
+
+        #save replay_buffer
+        rep_dir = os.path.join(checkpoint_dir, 'replay_buffers')
+        Path(rep_dir).mkdir(parents=True, exist_ok=True)
+        
+        for agent in self.agent_ids:
+
+            #save numpy arrays
+            np_file = os.path.join(rep_dir, agent + '.npz')
+            
+            np.savez(np_file,
+                     obses = self.replay_buffers[agent].obses,
+                     next_obses = self.replay_buffers[agent].next_obses,
+                     actions = self.replay_buffers[agent].actions,
+                     rewards = self.replay_buffers[agent].rewards,
+                     not_dones = self.replay_buffers[agent].not_dones,
+                     not_dones_no_max = self.replay_buffers[agent].not_dones_no_max
+                     )
+            
+            """
+            #save additional attributes
+            attr_file_path = os.path.join(rep_dir, agent + '.txt')
+            
+            attr_file = open(attr_file_path, 'w')
+            print(self.replay_buffers[agent].idx, file=attr_file)
+            print(self.replay_buffers[agent].last_save, file=attr_file)
+            print(self.replay_buffers[agent].full, file=attr_file)
+            attr_file.close()
+            """
+            
+
+            
+            
+

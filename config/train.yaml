@@ -6,15 +6,15 @@ env: multi_lane_highway_5V
 load_checkpoint: true
 save_checkpoint: true
 
-checkpoint_dir: 2023-12-07/14-35
-checkpoint_name: checkpoint-2400.pt
+checkpoint_dir: 2023-12-12/13-52
+checkpoint_name: cp_1800
 
 experiment: test_exp
 
-num_train_steps: 4800
+num_train_steps: 3600
 replay_buffer_capacity: ${num_train_steps}
 
-num_seed_steps: 3000
+num_seed_steps: 600
 
 eval_frequency: 100000
 num_eval_episodes: 1

@@ -126,44 +126,18 @@ class Workspace(object):
             self.loggers[agent].dump(self.step)
 
     def run(self):
-        episode, episode_rewards, done = 0, {}, True
+        episode_rewards, done, episode_step = {}, False, 0
+        episode = self.step / self.env.horizon
         for agent in self.agent_ids:
             episode_rewards[agent] = 0
-        start_time = time.time()
+        obs = self.env.reset()
+        self.agents.reset_all()
         
         while self.step < self.cfg.num_train_steps:
-            if done:
-                if self.step > 0:
-                    for agent in self.agent_ids:
-                        self.loggers[agent].log('train/duration',
-                                            time.time() - start_time, self.step)
-                        start_time = time.time()
-                        self.loggers[agent].dump(
-                                            self.step, save=(self.step > self.cfg.num_seed_steps))
-
-                # evaluate agent periodically
-                if self.step > 0 and self.step % self.cfg.eval_frequency == 0:
-                    for agent in self.agent_ids:
-                        self.loggers[agent].log('eval/episode', episode, self.step)
-                    self.evaluate()
-
-                for agent in self.agent_ids:
-                    self.loggers[agent].log('train/episode_reward', episode_rewards[agent],
-                                           self.step) 
-
-                obs = self.env.reset()
-                self.agents.reset_all()
-                done = False
-                for agent in self.agent_ids:
-                    episode_rewards[agent] = 0
-                episode_step = 0
-                episode += 1
-
-                for agent in self.agent_ids:
-                    self.loggers[agent].log('train/episode', episode, self.step)
+            start_time = time.time()
 
             # sample action for data collection
-            if self.step < self.cfg.num_seed_steps and not self.cfg.load_checkpoint:
+            if self.step < self.cfg.num_seed_steps: #and not self.cfg.load_checkpoint:
                 actions = {}
                 for agent in self.agent_ids:
                     actions[agent] = self.env.action_space[agent].sample()
@@ -186,6 +160,33 @@ class Workspace(object):
             obs = next_obs
             episode_step += 1
             self.step += 1
+
+
+            if done:
+                
+                for agent in self.agent_ids:
+                    self.loggers[agent].log('train/duration',
+                                        time.time() - start_time, self.step)
+                    self.loggers[agent].log('train/episode', episode, self.step)
+                    self.loggers[agent].log('train/episode_reward', episode_rewards[agent],
+                                           self.step)
+                    self.loggers[agent].dump(
+                                        self.step, save=(self.step > self.cfg.num_seed_steps))
+                    
+                # evaluate agent periodically
+                if self.step > 0 and self.step % self.cfg.eval_frequency == 0:
+                    for agent in self.agent_ids:
+                        self.loggers[agent].log('eval/episode', episode, self.step)
+                    self.evaluate()
+                    
+                obs = self.env.reset()
+                self.agents.reset_all()
+                done = False
+                for agent in self.agent_ids:
+                    episode_rewards[agent] = 0
+                episode_step = 0
+                episode += 1
+
 
         
         #save models and optimizers
