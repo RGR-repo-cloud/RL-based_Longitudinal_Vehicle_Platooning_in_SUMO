@@ -88,7 +88,7 @@ class MultiAgent:
             self.agents[agent].critic_optimizer.load_state_dict(model_checkpoint['optims'][agent]['critic'])
             self.agents[agent].actor_optimizer.load_state_dict(model_checkpoint['optims'][agent]['actor'])
             self.agents[agent].log_alpha_optimizer.load_state_dict(model_checkpoint['optims'][agent]['alpha'])
-            self.agents[agent].log_alpha = model_checkpoint['log_alpha'][agent]
+
 
         #load replay buffer entries
         rep_dir = os.path.join(dir, 'replay_buffers')
@@ -127,7 +127,6 @@ class MultiAgent:
         state = {}
         state['step'] = step
         state['models'] = self.agents.state_dict()
-        state['log_alpha'] = {}
         state['optims'] = {}
         
         for agent in self.agent_ids:
@@ -135,7 +134,6 @@ class MultiAgent:
             state['optims'][agent]['critic'] = self.agents[agent].critic_optimizer.state_dict()
             state['optims'][agent]['actor'] = self.agents[agent].actor_optimizer.state_dict()
             state['optims'][agent]['alpha'] = self.agents[agent].log_alpha_optimizer.state_dict()
-            state['log_alpha'][agent] = self.agents[agent].log_alpha
 
         torch.save(state, os.path.join(checkpoint_dir, 'checkpoint.pt'))
 
@@ -157,16 +155,6 @@ class MultiAgent:
                      not_dones_no_max = self.replay_buffers[agent].not_dones_no_max
                      )
             
-            """
-            #save additional attributes
-            attr_file_path = os.path.join(rep_dir, agent + '.txt')
-            
-            attr_file = open(attr_file_path, 'w')
-            print(self.replay_buffers[agent].idx, file=attr_file)
-            print(self.replay_buffers[agent].last_save, file=attr_file)
-            print(self.replay_buffers[agent].full, file=attr_file)
-            attr_file.close()
-            """
             
 
             

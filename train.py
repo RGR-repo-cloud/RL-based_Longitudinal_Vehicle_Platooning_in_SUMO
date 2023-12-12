@@ -187,7 +187,6 @@ class Workspace(object):
                 episode_step = 0
                 episode += 1
 
-
         
         #save models and optimizers
         if self.cfg.save_checkpoint:
