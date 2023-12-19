@@ -56,15 +56,11 @@ class FlowEnv(gym.Env):
     def __init__(self,
                  flow_params,
                  multiagent=False,
-                 shared=False,
-                 maddpg=False,
                  render=False,
                  version=0):
         
         # Initialize some variables.
         self.multiagent = multiagent
-        self.shared = shared
-        self.maddpg = maddpg
 
 
         # Create the wrapped environment.
@@ -82,7 +78,7 @@ class FlowEnv(gym.Env):
     @property
     def action_space(self):
         """See wrapped environment."""
-        if self.multiagent and not self.shared:
+        if self.multiagent:
             return {key: self.wrapped_env.action_space for key in self.agents}
         else:
             return self.wrapped_env.action_space
@@ -90,7 +86,7 @@ class FlowEnv(gym.Env):
     @property
     def observation_space(self):
         """See wrapped environment."""
-        if self.multiagent and not self.shared:
+        if self.multiagent:
             return {
                 key: self.wrapped_env.observation_space for key in self.agents}
         else:
@@ -132,27 +128,6 @@ class FlowEnv(gym.Env):
             return self.wrapped_env.query_expert(obs)
         else:
             raise ValueError("Environment does not have a query_expert method")
-
-
-
-def make_env(cfg):
-    """Helper function to create dm_control environment"""
-    if cfg.env == 'ball_in_cup_catch':
-        domain_name = 'ball_in_cup'
-        task_name = 'catch'
-    else:
-        domain_name = cfg.env.split('_')[0]
-        task_name = '_'.join(cfg.env.split('_')[1:])
-
-    env = dmc2gym.make(domain_name=domain_name,
-                       task_name=task_name,
-                       seed=cfg.seed,
-                       visualize_reward=True)
-    env.seed(cfg.seed)
-    assert env.action_space.low.min() >= -1
-    assert env.action_space.high.max() <= 1
-
-    return env
 
 
 class eval_mode(object):

@@ -17,27 +17,7 @@ from logger import Logger
 from replay_buffer import ReplayBuffer
 import utils
 import hydra
-from agent_system import MultiAgent
-
-
-def make_env(cfg):
-    """Helper function to create dm_control environment"""
-    if cfg.env == 'ball_in_cup_catch':
-        domain_name = 'ball_in_cup'
-        task_name = 'catch'
-    else:
-        domain_name = cfg.env.split('_')[0]
-        task_name = '_'.join(cfg.env.split('_')[1:])
-
-    env = dmc2gym.make(domain_name=domain_name,
-                       task_name=task_name,
-                       seed=cfg.seed,
-                       visualize_reward=True)
-    env.seed(cfg.seed)
-    assert env.action_space.low.min() >= -1
-    assert env.action_space.high.max() <= 1
-
-    return env
+from agent_system import IndividualMultiAgent, SharedMultiAgent
 
 
 class Workspace(object):
@@ -60,8 +40,8 @@ class Workspace(object):
         self.device = torch.device(cfg.device)
         
         #register environment
-        self.env = utils.import_flow_env(cfg.env, False, False) #quick fix
-        self.env.seed(cfg.seed)
+        self.env = utils.import_flow_env(env_name=self.cfg.env, render=self.cfg.render, evaluate=False)
+        self.env.seed(self.cfg.seed)
         self.agent_ids = self.env.agents
 
         #initialize loggers
@@ -71,25 +51,40 @@ class Workspace(object):
                                             agent_id=agent,
                                             save_tb=cfg.log_save_tb,
                                             log_frequency=cfg.log_frequency,
-                                            agent=cfg.agent.name,
+                                            agent=self.cfg.agent.name,
                                             file_exists=cfg.load_checkpoint)
         
-        #initialize input and output parameters
-        obs_spaces, act_spaces, act_ranges = {}, {}, {}
-        for agent in self.agent_ids:
-            obs_spaces[agent] = self.env.observation_space[agent].shape
-            act_spaces[agent] = self.env.action_space[agent].shape
-            act_ranges[agent] = [   float(self.env.action_space[agent].low.min()),
-                                    float(self.env.action_space[agent].high.max())]
-
         #initialize agents
-        self.agents = MultiAgent(cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(cfg.replay_buffer_capacity), self.device)
+        if self.cfg.multi_agent_mode == 'individual':
+            
+            #initialize input and output parameters
+            obs_spaces, act_spaces, act_ranges = {}, {}, {}
+            for agent in self.agent_ids:
+                obs_spaces[agent] = self.env.observation_space[agent].shape
+                act_spaces[agent] = self.env.action_space[agent].shape
+                act_ranges[agent] = [   float(self.env.action_space[agent].low.min()),
+                                        float(self.env.action_space[agent].high.max())]
+                
+            self.multi_agent = IndividualMultiAgent(self.cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(self.cfg.replay_buffer_capacity), self.device, self.cfg.mode, self.cfg.agent)
+        
+        elif self.cfg.multi_agent_mode == 'shared':
+            
+            #initialize input and output parameters of the first agent_id (all agents should be the same)
+            obs_space = self.env.observation_space[self.agent_ids[0]].shape
+            act_space = self.env.action_space[self.agent_ids[0]].shape
+            act_range = [   float(self.env.action_space[self.agent_ids[0]].low.min()),
+                            float(self.env.action_space[self.agent_ids[0]].high.max())]
+                
+            self.multi_agent = SharedMultiAgent(self.cfg, self.agent_ids, obs_space, act_space, act_range, int(self.cfg.replay_buffer_capacity)*len(self.agent_ids), self.device, self.cfg.mode, self.cfg.agent)
+  
+        else:
+            raise Exception('no valid multiagent_mode')
 
         self.step = 0
         
         #load checkpoint
         if cfg.load_checkpoint:
-            self.step = self.agents.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints', self.cfg.checkpoint_name))
+            self.step = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint_name)
 
 
         self.video_recorder = VideoRecorder(
@@ -103,14 +98,14 @@ class Workspace(object):
             average_episode_rewards[agent] = 0
         for episode in range(self.cfg.num_eval_episodes):
             obs = self.env.reset()
-            self.agents.reset_all()
+            self.multi_agent.reset()
             self.video_recorder.init(enabled=(episode == 0))
             done = False
             episode_rewards = {}
             for agent in self.agent_ids:
                     episode_rewards[agent] = 0
             while not done:
-                actions = self.agents.act_all(obs, sample=False, mode="eval")
+                actions = self.multi_agent.act(obs, sample=False, mode="eval")
                 obs, rewards, done, _ = self.env.step(actions)
                 self.video_recorder.record(self.env)
                 for agent in self.agent_ids:
@@ -125,28 +120,29 @@ class Workspace(object):
                         self.step)
             self.loggers[agent].dump(self.step)
 
-    def run(self):
+
+    def train(self):
         episode_rewards, done, episode_step = {}, False, 0
         episode = self.step / self.env.horizon
         for agent in self.agent_ids:
             episode_rewards[agent] = 0
         obs = self.env.reset()
-        self.agents.reset_all()
+        self.multi_agent.reset()
         
         while self.step < self.cfg.num_train_steps:
             start_time = time.time()
 
             # sample action for data collection
-            if self.step < self.cfg.num_seed_steps: #and not self.cfg.load_checkpoint:
+            if self.step < self.cfg.num_seed_steps:
                 actions = {}
                 for agent in self.agent_ids:
                     actions[agent] = self.env.action_space[agent].sample()
             else:
-                actions = self.agents.act_all(obs, sample=True, mode="eval")
+                actions = self.multi_agent.act(obs, sample=True, mode="eval")
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:
-                self.agents.update_all(self.loggers, self.step)
+                self.multi_agent.update(self.loggers, self.step)
 
             next_obs, rewards, done, _ = self.env.step(actions)
 
@@ -155,7 +151,7 @@ class Workspace(object):
             done_no_max = 0 if episode_step + 1 == self.env.horizon else done
             for agent in self.agent_ids:
                 episode_rewards[agent] += rewards[agent]
-            self.agents.add_to_buffers(obs, actions, rewards, next_obs, done, done_no_max)
+            self.multi_agent.add_to_buffer(obs, actions, rewards, next_obs, done, done_no_max)
 
             obs = next_obs
             episode_step += 1
@@ -180,7 +176,7 @@ class Workspace(object):
                     self.evaluate()
                     
                 obs = self.env.reset()
-                self.agents.reset_all()
+                self.multi_agent.reset()
                 done = False
                 for agent in self.agent_ids:
                     episode_rewards[agent] = 0
@@ -190,7 +186,7 @@ class Workspace(object):
         
         #save models and optimizers
         if self.cfg.save_checkpoint:
-            self.agents.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step)
+            self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step)
             
 
             
@@ -198,11 +194,20 @@ class Workspace(object):
 
 
 
-@hydra.main(config_path='config/train.yaml', strict=True)
+@hydra.main(config_path='config/run.yaml', strict=True)
 def main(cfg):
     workspace = Workspace(cfg)
-    workspace.run()
-    workspace.evaluate()
+    
+    if cfg.mode == 'train':
+        start = time.time()
+        workspace.train()
+        end = time.time()
+        print('TOTAL_TIME:')
+        print(end-start)
+    elif cfg.mode == 'eval':
+        workspace.evaluate()
+    else:
+        raise Exception('no valid running mode')
 
 
 if __name__ == '__main__':

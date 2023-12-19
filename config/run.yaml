@@ -1,17 +1,22 @@
 defaults:
     - agent: sac
 
-env: multi_lane_highway_5V
+env: platoon_exp
+
+multi_agent_mode: shared
+
+mode: eval
+render: true
 
 load_checkpoint: true
 save_checkpoint: true
 
-checkpoint_dir: 2023-12-12/13-52
-checkpoint_name: cp_1800
+checkpoint_dir: 2023-12-18/12-17
+checkpoint_name: cp_255000
 
 experiment: test_exp
 
-num_train_steps: 3600
+num_train_steps: 255000
 replay_buffer_capacity: ${num_train_steps}
 
 num_seed_steps: 600
