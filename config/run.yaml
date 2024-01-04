@@ -3,36 +3,33 @@ defaults:
 
 env: platoon_exp
 
-multi_agent_mode: shared
+# "shared" or "individual"
+multi_agent_mode: shared 
 
+# "train" or "eval"
 mode: eval
 render: true
 
 load_checkpoint: true
 save_checkpoint: true
 
-checkpoint_dir: 2023-12-18/12-17
-checkpoint_name: cp_255000
+run_directory: 2024-01-04/18-54
+checkpoint: cp_12068
 
-experiment: test_exp
-
-num_train_steps: 255000
+num_train_steps: 12000
 replay_buffer_capacity: ${num_train_steps}
 
-num_seed_steps: 600
+num_seed_steps: 3600
 
 eval_frequency: 100000
 num_eval_episodes: 1
 
-device: cuda
+# "cuda" or "cpu"
+device: cpu
 
 # logger
 log_frequency: 600
 log_save_tb: true
-
-# video recorder
-save_video: false
-
 
 seed: 1
 

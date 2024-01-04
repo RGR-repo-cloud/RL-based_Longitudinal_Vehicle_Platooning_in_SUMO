@@ -12,7 +12,6 @@ import sys
 import time
 import pickle as pkl
 
-from video import VideoRecorder
 from logger import Logger
 from replay_buffer import ReplayBuffer
 import utils
@@ -25,7 +24,7 @@ class Workspace(object):
 
         #change working directory to location of checkpoint or create new one
         if cfg.load_checkpoint:
-            os.chdir(os.path.join(os.getcwd(), cfg.checkpoint_dir))
+            os.chdir(os.path.join(os.getcwd(), cfg.run_directory))
         else:
             dir = os.path.join(os.getcwd(), datetime.datetime.now().strftime('%Y-%m-%d'), datetime.datetime.now().strftime('%H-%M'))
             Path(dir).mkdir(parents=True, exist_ok=True)
@@ -84,11 +83,7 @@ class Workspace(object):
         
         #load checkpoint
         if cfg.load_checkpoint:
-            self.step = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint_name)
-
-
-        self.video_recorder = VideoRecorder(
-            self.work_dir if cfg.save_video else None)
+            self.step = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint)
         
 
 
@@ -99,7 +94,6 @@ class Workspace(object):
         for episode in range(self.cfg.num_eval_episodes):
             obs = self.env.reset()
             self.multi_agent.reset()
-            self.video_recorder.init(enabled=(episode == 0))
             done = False
             episode_rewards = {}
             for agent in self.agent_ids:
@@ -107,13 +101,11 @@ class Workspace(object):
             while not done:
                 actions = self.multi_agent.act(obs, sample=False, mode="eval")
                 obs, rewards, done, _ = self.env.step(actions)
-                self.video_recorder.record(self.env)
                 for agent in self.agent_ids:
                     episode_rewards[agent] += rewards[agent]
 
             for agent in self.agent_ids:
                 average_episode_rewards[agent] += episode_rewards[agent]
-            self.video_recorder.save(f'{self.step}.mp4')
         for agent in self.agent_ids:
             average_episode_rewards[agent] /= self.cfg.num_eval_episodes
             self.loggers[agent].log('eval/episode_reward', average_episode_rewards[agent],
@@ -128,8 +120,9 @@ class Workspace(object):
             episode_rewards[agent] = 0
         obs = self.env.reset()
         self.multi_agent.reset()
-        
-        while self.step < self.cfg.num_train_steps:
+        training_done = False # ensure that the last episode does not get interrupted
+
+        while not training_done:
             start_time = time.time()
 
             # sample action for data collection
@@ -145,12 +138,21 @@ class Workspace(object):
                 self.multi_agent.update(self.loggers, self.step)
 
             next_obs, rewards, done, _ = self.env.step(actions)
+            """
+            print("actions:", end=" ")
+            print(actions)
+            print("obs:", end=" ")
+            for agent in self.agent_ids:
+                print(next_obs[agent][1], end=" ")
+            print("")
+            """
 
             # allow infinite bootstrap
             done = float(done)
             done_no_max = 0 if episode_step + 1 == self.env.horizon else done
             for agent in self.agent_ids:
                 episode_rewards[agent] += rewards[agent]
+
             self.multi_agent.add_to_buffer(obs, actions, rewards, next_obs, done, done_no_max)
 
             obs = next_obs
@@ -160,6 +162,8 @@ class Workspace(object):
 
             if done:
                 
+                print("done!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
                 for agent in self.agent_ids:
                     self.loggers[agent].log('train/duration',
                                         time.time() - start_time, self.step)
@@ -182,6 +186,7 @@ class Workspace(object):
                     episode_rewards[agent] = 0
                 episode_step = 0
                 episode += 1
+                training_done = self.step > self.cfg.num_train_steps
 
         
         #save models and optimizers
@@ -190,10 +195,6 @@ class Workspace(object):
             
 
             
-
-
-
-
 @hydra.main(config_path='config/run.yaml', strict=True)
 def main(cfg):
     workspace = Workspace(cfg)

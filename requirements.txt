@@ -1,0 +1,4 @@
+cudatoolkit==9.2
+termcolor
+tb-nightly
+git+https://github.com/facebookresearch/hydra@0.11_branch
