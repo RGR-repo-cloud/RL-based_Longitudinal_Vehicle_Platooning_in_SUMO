@@ -70,7 +70,8 @@ class SACAgent(Agent, nn.Module):
         obs = obs.unsqueeze(0)
         dist = self.actor(obs)
         action = dist.sample() if sample else dist.mean
-        action = action.clamp(*self.action_range)
+        #action = action.clamp(*self.action_range)
+        action = utils.scale_action(-1.0, 1.0, self.action_range[0], self.action_range[1], action)
         assert action.ndim == 2 and action.shape[0] == 1
         return utils.to_np(action[0])
 

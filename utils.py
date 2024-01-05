@@ -9,8 +9,6 @@ from collections import deque
 import random
 import math
 
-import dmc2gym
-
 import flow.config as config
 import sys
 from gym.spaces import Box
@@ -66,14 +64,11 @@ class FlowEnv(gym.Env):
         # Create the wrapped environment.
         create_env, _ = make_create_env(flow_params, version, render)
         self.wrapped_env = create_env()
+        self.horizon = self.wrapped_env.env_params.horizon
 
         # Collect the IDs of individual vehicles if using a multi-agent env.
         if self.multiagent:
             self.agents = list(self.wrapped_env.reset().keys())
-
-        # for tracking the time horizon
-        self.step_number = 0
-        self.horizon = self.wrapped_env.env_params.horizon
 
     @property
     def action_space(self):
@@ -97,22 +92,12 @@ class FlowEnv(gym.Env):
 
         The done term is also modified in case the time horizon is met.
         """
-        obs, reward, done, info_dict = self.wrapped_env.step(action)
+        obs, reward, done, infos = self.wrapped_env.step(action)
 
-        # Check if the time horizon has been met.
-        self.step_number += 1
-        if isinstance(done, dict):
-            done = {key: done[key] or self.step_number == self.horizon
-                    for key in obs.keys()}
-            done["__all__"] = all(done.values())
-        else:
-            done = done or self.step_number == self.horizon
-
-        return obs, reward, done["__all__"], info_dict  ########################quick fix
+        return obs, reward, done["__all__"], infos
 
     def reset(self):
         """Reset the environment."""
-        self.step_number = 0
 
         obs = self.wrapped_env.reset()
 
@@ -227,3 +212,17 @@ def to_np(t):
         return np.array([])
     else:
         return t.cpu().detach().numpy()
+    
+def scale_action(orig_min, orig_max, des_min, des_max, action):
+    orig_middle = (orig_max + orig_min) / 2
+    des_middle = (des_max + des_min) / 2
+    orig_range = orig_max - orig_min
+    des_range = des_max - des_min
+    range_factor = des_range / orig_range
+    scaled_orig_middle = range_factor * orig_middle
+    shift = des_middle - scaled_orig_middle
+
+    return action * range_factor + shift
+
+
+
