@@ -138,15 +138,7 @@ class Workspace(object):
                 self.multi_agent.update(self.loggers, self.step)
 
             next_obs, rewards, done, _ = self.env.step(actions)
-            """
-            print("actions:", end=" ")
-            print(actions)
-            print("obs:", end=" ")
-            for agent in self.agent_ids:
-                print(next_obs[agent][1], end=" ")
-            print("")
-            """
-
+            
             # allow infinite bootstrap
             done = float(done)
             done_no_max = 0 if episode_step + 1 == self.env.horizon else done
@@ -161,8 +153,6 @@ class Workspace(object):
 
 
             if done:
-                
-                print("done!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
                 for agent in self.agent_ids:
                     self.loggers[agent].log('train/duration',
