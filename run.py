@@ -40,7 +40,7 @@ class Workspace(object):
         
         #register environment
         self.env = utils.import_flow_env(env_name=self.cfg.env, render=self.cfg.render, evaluate=False)
-        self.env.seed(self.cfg.seed)
+        #self.env.seed(self.cfg.seed)
         self.agent_ids = self.env.agents
 
         #initialize loggers
