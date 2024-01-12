@@ -83,7 +83,7 @@ class Workspace(object):
         
         #load checkpoint
         if cfg.load_checkpoint:
-            self.step = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint)
+            self.step = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint, self.cfg.loading_device)
         
 
 

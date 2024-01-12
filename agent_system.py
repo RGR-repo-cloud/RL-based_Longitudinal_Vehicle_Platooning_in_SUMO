@@ -105,14 +105,14 @@ class IndividualMultiAgent(MultiAgent):
             self.replay_buffers[agent].add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, done_no_max)
 
 
-    def load_checkpoint(self, dir, checkpoint):
+    def load_checkpoint(self, dir, checkpoint, device):
 
         print("started loading checkpoint " + checkpoint)
 
         checkpoint_dir = os.path.join(dir, checkpoint)
 
         #load model parameters
-        model_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint.pt'))
+        model_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint.pt'), map_location=device)
         self.agents.load_state_dict(model_checkpoint['models'])
         step = model_checkpoint['step']
       
@@ -299,14 +299,14 @@ class SharedMultiAgent(MultiAgent):
         print("saving checkpoint " + checkpoint + " finished")
 
 
-    def load_checkpoint(self, dir, checkpoint):
+    def load_checkpoint(self, dir, checkpoint, device):
         
         print("started loading checkpoint " + checkpoint)
 
         checkpoint_dir = os.path.join(dir, checkpoint)
 
         #load model parameters
-        model_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint.pt'))
+        model_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint.pt'), map_location=device)
         self.agent.load_state_dict(model_checkpoint['models'])
         step = model_checkpoint['step']
       

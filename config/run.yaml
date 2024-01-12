@@ -7,14 +7,15 @@ env: platoon_exp
 multi_agent_mode: shared
 
 # "train" or "eval"
-mode: train
-render: false
+mode: eval
+render: true
 
-load_checkpoint: false
+load_checkpoint: true
 save_checkpoint: false
+loading_device: cuda:0
 
-run_directory: 2024-01-05/16-41
-checkpoint: cp_100083
+run_directory: 2024-01-11/23-47
+checkpoint: cp_450573
 
 num_train_steps: 1800
 replay_buffer_capacity: ${num_train_steps}
