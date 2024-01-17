@@ -7,26 +7,26 @@ env: platoon_exp
 multi_agent_mode: shared
 
 # "train" or "eval"
-mode: eval
-render: true
+mode: train
+render: false
 
-load_checkpoint: true
-save_checkpoint: false
-loading_device: cuda:0
+load_checkpoint: false
+save_checkpoint: true
+checkpoint_frequency: 1000
 
-run_directory: 2024-01-11/23-47
-checkpoint: cp_450573
+run_directory: 2024-01-15/23-07
+checkpoint: cp_1833
 
-num_train_steps: 1800
-replay_buffer_capacity: ${num_train_steps}
+num_train_steps: 2000
+replay_buffer_capacity: 50000 #${num_train_steps}
 
 num_seed_steps: 600
 
-eval_frequency: 100000
-num_eval_episodes: 1
+eval_frequency: 1000
+num_eval_episodes: 2
 
 # "cuda" or "cpu"
-device: cuda
+device: cpu
 
 # logger
 log_frequency: 600

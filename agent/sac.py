@@ -36,7 +36,6 @@ class SACAgent(Agent, nn.Module):
         self.actor = hydra.utils.instantiate(actor_cfg).to(self.device)
 
         self.log_alpha = torch.nn.Parameter(torch.tensor(np.log(init_temperature)).to(self.device),requires_grad=True)
-        #self.log_alpha.requires_grad = True ###########
         # set target entropy to -|A|
         self.target_entropy = -action_dim
 

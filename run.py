@@ -80,10 +80,11 @@ class Workspace(object):
             raise Exception('no valid multiagent_mode')
 
         self.step = 0
+        self.episode = 0
         
         #load checkpoint
         if cfg.load_checkpoint:
-            self.step = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint, self.cfg.loading_device)
+            self.step, self.episode = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint, self.cfg.device, int(self.cfg.replay_buffer_capacity))
         
 
 
@@ -114,8 +115,8 @@ class Workspace(object):
 
 
     def train(self):
-        episode_rewards, done, episode_step = {}, False, 0
-        episode = self.step / self.env.horizon
+        episode_rewards, done,  = {}, False
+        episode_step, session_step, eval_count, checkpoint_count = 0, 0, 0, 0
         for agent in self.agent_ids:
             episode_rewards[agent] = 0
         obs = self.env.reset()
@@ -150,6 +151,7 @@ class Workspace(object):
             obs = next_obs
             episode_step += 1
             self.step += 1
+            session_step += 1
 
 
             if done:
@@ -157,17 +159,18 @@ class Workspace(object):
                 for agent in self.agent_ids:
                     self.loggers[agent].log('train/duration',
                                         time.time() - start_time, self.step)
-                    self.loggers[agent].log('train/episode', episode, self.step)
+                    self.loggers[agent].log('train/episode', self.episode, self.step)
                     self.loggers[agent].log('train/episode_reward', episode_rewards[agent],
                                            self.step)
                     self.loggers[agent].dump(
                                         self.step, save=(self.step > self.cfg.num_seed_steps))
                     
                 # evaluate agent periodically
-                if self.step > 0 and self.step % self.cfg.eval_frequency == 0:
+                if int(session_step / self.cfg.eval_frequency) > eval_count:
                     for agent in self.agent_ids:
-                        self.loggers[agent].log('eval/episode', episode, self.step)
+                        self.loggers[agent].log('eval/episode', self.episode, self.step)
                     self.evaluate()
+                    eval_count +=1
                     
                 obs = self.env.reset()
                 self.multi_agent.reset()
@@ -175,13 +178,13 @@ class Workspace(object):
                 for agent in self.agent_ids:
                     episode_rewards[agent] = 0
                 episode_step = 0
-                episode += 1
-                training_done = self.step > self.cfg.num_train_steps
-
-        
-        #save models and optimizers
-        if self.cfg.save_checkpoint:
-            self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step)
+                self.episode += 1
+                training_done = self.step >= self.cfg.num_train_steps
+                
+                #save models and optimizers
+                if self.cfg.save_checkpoint and int(session_step / self.cfg.checkpoint_frequency) > checkpoint_count:
+                    self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step, self.episode)
+                    checkpoint_count += 1
             
 
             

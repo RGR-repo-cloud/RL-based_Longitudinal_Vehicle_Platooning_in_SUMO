@@ -105,7 +105,7 @@ class IndividualMultiAgent(MultiAgent):
             self.replay_buffers[agent].add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, done_no_max)
 
 
-    def load_checkpoint(self, dir, checkpoint, device):
+    def load_checkpoint(self, dir, checkpoint, device, replay_buffer_capacity):
 
         print("started loading checkpoint " + checkpoint)
 
@@ -115,6 +115,7 @@ class IndividualMultiAgent(MultiAgent):
         model_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint.pt'), map_location=device)
         self.agents.load_state_dict(model_checkpoint['models'])
         step = model_checkpoint['step']
+        episode = model_checkpoint['episode']
       
         for agent in self.agent_ids:
             self.agents[agent].critic_optimizer.load_state_dict(model_checkpoint['optims'][agent]['critic'])
@@ -130,7 +131,7 @@ class IndividualMultiAgent(MultiAgent):
             for agent in self.agent_ids:
                 data = np.load(os.path.join(rep_dir, agent + '.npz'))
                 
-                for i in range(step):#quick fix
+                for i in range(min(step, replay_buffer_capacity)):
 
                     obs = data['obses'][i]
                     next_obs = data['next_obses'][i]
@@ -150,10 +151,10 @@ class IndividualMultiAgent(MultiAgent):
 
         print("loading checkpoint " + checkpoint + " finished")
 
-        return step
+        return step, episode
     
 
-    def save_checkpoint(self, dir, step):
+    def save_checkpoint(self, dir, step, episode):
 
         checkpoint = 'cp_{:d}'.format(step)
 
@@ -165,6 +166,7 @@ class IndividualMultiAgent(MultiAgent):
         #save model parameters
         state = {}
         state['step'] = step
+        state['episode'] = episode
         state['models'] = self.agents.state_dict()
         state['optims'] = {}
         
@@ -260,7 +262,7 @@ class SharedMultiAgent(MultiAgent):
             self.replay_buffer.add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, done_no_max)
 
 
-    def save_checkpoint(self, dir, step):
+    def save_checkpoint(self, dir, step, episode):
         
         checkpoint = 'cp_{:d}'.format(step)
 
@@ -272,6 +274,7 @@ class SharedMultiAgent(MultiAgent):
         #save model parameters
         state = {}
         state['step'] = step
+        state['episode'] = episode
         state['models'] = self.agent.state_dict()
         state['optims'] = {}
     
@@ -299,7 +302,7 @@ class SharedMultiAgent(MultiAgent):
         print("saving checkpoint " + checkpoint + " finished")
 
 
-    def load_checkpoint(self, dir, checkpoint, device):
+    def load_checkpoint(self, dir, checkpoint, device, replay_buffer_capacity):
         
         print("started loading checkpoint " + checkpoint)
 
@@ -309,6 +312,7 @@ class SharedMultiAgent(MultiAgent):
         model_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint.pt'), map_location=device)
         self.agent.load_state_dict(model_checkpoint['models'])
         step = model_checkpoint['step']
+        episode = model_checkpoint['episode']
       
         self.agent.critic_optimizer.load_state_dict(model_checkpoint['optims']['critic'])
         self.agent.actor_optimizer.load_state_dict(model_checkpoint['optims']['actor'])
@@ -320,7 +324,7 @@ class SharedMultiAgent(MultiAgent):
 
             data = np.load(os.path.join(checkpoint_dir, 'replay_buffer.npz'))
             
-            for i in range(step * len(self.agent_ids)):#quick fix
+            for i in range(min(step, replay_buffer_capacity) * len(self.agent_ids)):
 
                 obs = data['obses'][i]
                 next_obs = data['next_obses'][i]
@@ -340,7 +344,7 @@ class SharedMultiAgent(MultiAgent):
 
         print("loading checkpoint " + checkpoint + " finished")
 
-        return step
+        return step, episode
             
             
 
