@@ -93,20 +93,24 @@ class Workspace(object):
         for agent in self.agent_ids:
             average_episode_rewards[agent] = 0
         for episode in range(self.cfg.num_eval_episodes):
+            episode_step = 0
             obs = self.env.reset()
             self.multi_agent.reset()
             done = False
             episode_rewards = {}
             for agent in self.agent_ids:
                     episode_rewards[agent] = 0
+
             while not done:
                 actions = self.multi_agent.act(obs, sample=False, mode="eval")
                 obs, rewards, done, _ = self.env.step(actions)
                 for agent in self.agent_ids:
                     episode_rewards[agent] += rewards[agent]
+                episode_step += 1
 
             for agent in self.agent_ids:
                 average_episode_rewards[agent] += episode_rewards[agent]
+        
         for agent in self.agent_ids:
             average_episode_rewards[agent] /= self.cfg.num_eval_episodes
             self.loggers[agent].log('eval/episode_reward', average_episode_rewards[agent],
@@ -136,7 +140,10 @@ class Workspace(object):
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:
-                self.multi_agent.update(self.loggers, self.step)
+                if not self.cfg.fed_enabled or not session_step % self.cfg.fed_frequency == 0 or self.cfg.multi_agent_mode == 'shared':
+                    self.multi_agent.update(self.loggers, self.step)
+                else:
+                    self.multi_agent.federate(self.cfg.fed_pre_weight, self.cfg.fed_post_weight)
 
             next_obs, rewards, done, _ = self.env.step(actions)
             

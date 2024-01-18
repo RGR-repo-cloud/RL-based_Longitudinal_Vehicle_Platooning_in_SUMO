@@ -99,6 +99,136 @@ class IndividualMultiAgent(MultiAgent):
             self.agents[agent].update(self.replay_buffers[agent], loggers[agent], step)
 
 
+    def federate(self, pre_weight, post_weight):
+
+            with torch.no_grad():
+                
+                orig_weights = {}
+                
+                # detach weights
+                for agent in self.agent_ids:
+
+                    orig_weights[agent] = {}
+
+                    orig_weights[agent]['actor'] = []
+                    for weight in self.agents[agent].actor.parameters():
+                        orig_weights[agent]['actor'].append(weight.detach())
+
+                    orig_weights[agent]['critic_Q1'] = []
+                    for weight in self.agents[agent].critic.Q1.parameters():
+                        orig_weights[agent]['critic_Q1'].append(weight.detach())
+
+                    orig_weights[agent]['critic_Q2'] = []
+                    for weight in self.agents[agent].critic.Q2.parameters():
+                        orig_weights[agent]['critic_Q2'].append(weight.detach())
+                    
+                    orig_weights[agent]['target_Q1'] = []
+                    for weight in self.agents[agent].critic_target.Q1.parameters():
+                        orig_weights[agent]['target_Q1'].append(weight.detach())
+
+                    orig_weights[agent]['target_Q2'] = []
+                    for weight in self.agents[agent].critic_target.Q2.parameters():
+                        orig_weights[agent]['target_Q2'].append(weight.detach())
+
+
+                temp_weights = {}
+
+                # aggregate weights
+                for id, agent in enumerate(self.agent_ids):
+
+                    temp_weights[agent] = {}
+
+                    # if leader    
+                    if id == 0:
+                        
+                        temp_weights[agent]['actor'] = []
+                        for weight_id in range(len(orig_weights[agent]['actor'])):
+                            temp_weights[agent]['actor'].append((1 - post_weight) * orig_weights[agent]['actor'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['actor'][weight_id])
+                        
+                        temp_weights[agent]['critic_Q1'] = []
+                        for weight_id in range(len(orig_weights[agent]['critic_Q1'])):
+                            temp_weights[agent]['critic_Q1'].append((1 - post_weight) * orig_weights[agent]['critic_Q1'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['critic_Q1'][weight_id])
+
+                        temp_weights[agent]['critic_Q2'] = []
+                        for weight_id in range(len(orig_weights[agent]['critic_Q2'])):
+                            temp_weights[agent]['critic_Q2'].append((1 - post_weight) * orig_weights[agent]['critic_Q2'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['critic_Q2'][weight_id])
+
+                        temp_weights[agent]['target_Q1'] = []
+                        for weight_id in range(len(orig_weights[agent]['target_Q1'])):
+                            temp_weights[agent]['target_Q1'].append((1 - post_weight) * orig_weights[agent]['target_Q1'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['target_Q1'][weight_id])
+
+                        temp_weights[agent]['target_Q2'] = []
+                        for weight_id in range(len(orig_weights[agent]['target_Q2'])):
+                            temp_weights[agent]['target_Q2'].append((1 - post_weight) * orig_weights[agent]['target_Q2'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['target_Q2'][weight_id])
+
+                    # if last follower
+                    elif id == len(self.agent_ids) - 1:
+                        
+                        temp_weights[agent]['actor'] = []
+                        for weight_id in range(len(orig_weights[agent]['actor'])):
+                            temp_weights[agent]['actor'].append((1 - pre_weight) * orig_weights[agent]['actor'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['actor'][weight_id])
+                        
+                        temp_weights[agent]['critic_Q1'] = []
+                        for weight_id in range(len(orig_weights[agent]['critic_Q1'])):
+                            temp_weights[agent]['critic_Q1'].append((1 - pre_weight) * orig_weights[agent]['critic_Q1'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['critic_Q1'][weight_id])
+
+                        temp_weights[agent]['critic_Q2'] = []
+                        for weight_id in range(len(orig_weights[agent]['critic_Q2'])):
+                            temp_weights[agent]['critic_Q2'].append((1 - pre_weight) * orig_weights[agent]['critic_Q2'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['critic_Q2'][weight_id])
+
+                        temp_weights[agent]['target_Q1'] = []
+                        for weight_id in range(len(orig_weights[agent]['target_Q1'])):
+                            temp_weights[agent]['target_Q1'].append((1 - pre_weight) * orig_weights[agent]['target_Q1'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q1'][weight_id])
+
+                        temp_weights[agent]['target_Q2'] = []
+                        for weight_id in range(len(orig_weights[agent]['target_Q2'])):
+                            temp_weights[agent]['target_Q2'].append((1 - pre_weight) * orig_weights[agent]['target_Q2'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q2'][weight_id])
+
+                    else:
+                        
+                        temp_weights[agent]['actor'] = []
+                        for weight_id in range(len(orig_weights[agent]['actor'])):
+                            temp_weights[agent]['actor'].append((1 - pre_weight - post_weight) * orig_weights[agent]['actor'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['actor'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['actor'][weight_id])
+                        
+                        temp_weights[agent]['critic_Q1'] = []
+                        for weight_id in range(len(orig_weights[agent]['critic_Q1'])):
+                            temp_weights[agent]['critic_Q1'].append((1 - pre_weight - post_weight) * orig_weights[agent]['critic_Q1'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['critic_Q1'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['critic_Q1'][weight_id])
+
+                        temp_weights[agent]['critic_Q2'] = []
+                        for weight_id in range(len(orig_weights[agent]['critic_Q2'])):
+                            temp_weights[agent]['critic_Q2'].append((1 - pre_weight - post_weight) * orig_weights[agent]['critic_Q2'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['critic_Q2'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['critic_Q2'][weight_id])
+
+                        temp_weights[agent]['target_Q1'] = []
+                        for weight_id in range(len(orig_weights[agent]['target_Q1'])):
+                            temp_weights[agent]['target_Q1'].append((1 - pre_weight - post_weight) * orig_weights[agent]['target_Q1'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q1'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['target_Q1'][weight_id])
+
+                        temp_weights[agent]['target_Q2'] = []
+                        for weight_id in range(len(orig_weights[agent]['target_Q2'])):
+                            temp_weights[agent]['target_Q2'].append((1 - pre_weight - post_weight) * orig_weights[agent]['target_Q2'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q2'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['target_Q2'][weight_id])
+
+                
+                # update weights
+                
+                for agent in self.agent_ids:
+
+                    for param, weight in zip(self.agents[agent].actor.parameters(), temp_weights[agent]['actor']):
+                        param.copy_(weight)
+
+                    for param, weight in zip(self.agents[agent].critic.Q1.parameters(), temp_weights[agent]['critic_Q1']):
+                        param.copy_(weight)
+
+                    for param, weight in zip(self.agents[agent].critic.Q2.parameters(), temp_weights[agent]['critic_Q2']):
+                        param.copy_(weight)
+
+                    for param, weight in zip(self.agents[agent].critic_target.Q1.parameters(), temp_weights[agent]['target_Q1']):
+                        param.copy_(weight)
+
+                    for param, weight in zip(self.agents[agent].critic_target.Q2.parameters(), temp_weights[agent]['target_Q2']):
+                        param.copy_(weight)
+
+
+                    
+
     def add_to_buffer(self, obs, actions, rewards, next_obs, done, done_no_max):
 
         for agent in self.agent_ids:

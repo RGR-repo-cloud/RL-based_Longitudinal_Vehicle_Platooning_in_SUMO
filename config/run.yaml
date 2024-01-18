@@ -4,7 +4,7 @@ defaults:
 env: platoon_exp
 
 # "shared" or "individual"
-multi_agent_mode: shared
+multi_agent_mode: individual
 
 # "train" or "eval"
 mode: train
@@ -12,21 +12,27 @@ render: false
 
 load_checkpoint: false
 save_checkpoint: true
-checkpoint_frequency: 1000
+checkpoint_frequency: ${num_train_steps}
 
-run_directory: 2024-01-15/23-07
-checkpoint: cp_1833
+run_directory: 2024-01-18/14-15
+checkpoint: cp_12043
 
-num_train_steps: 2000
+num_train_steps: 12000
 replay_buffer_capacity: 50000 #${num_train_steps}
 
 num_seed_steps: 600
 
 eval_frequency: 1000
-num_eval_episodes: 2
+num_eval_episodes: 1
+
+fed_enabled: true
+fed_frequency: 12
+
+fed_pre_weight: 0.34
+fed_post_weight: 0.16
 
 # "cuda" or "cpu"
-device: cpu
+device: cuda
 
 # logger
 log_frequency: 600
