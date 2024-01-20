@@ -229,10 +229,10 @@ class IndividualMultiAgent(MultiAgent):
 
                     
 
-    def add_to_buffer(self, obs, actions, rewards, next_obs, done, done_no_max):
+    def add_to_buffer(self, obs, actions, rewards, next_obs, done, dones_no_max):
 
         for agent in self.agent_ids:
-            self.replay_buffers[agent].add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, done_no_max)
+            self.replay_buffers[agent].add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, dones_no_max[agent])
 
 
     def load_checkpoint(self, dir, checkpoint, device, replay_buffer_capacity):
@@ -386,10 +386,10 @@ class SharedMultiAgent(MultiAgent):
             self.agent.update(self.replay_buffer, loggers[agent], step)
 
 
-    def add_to_buffer(self, obs, actions, rewards, next_obs, done, done_no_max):
+    def add_to_buffer(self, obs, actions, rewards, next_obs, done, dones_no_max):
         
         for agent in self.agent_ids:
-            self.replay_buffer.add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, done_no_max)
+            self.replay_buffer.add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, dones_no_max[agent])
 
 
     def save_checkpoint(self, dir, step, episode):

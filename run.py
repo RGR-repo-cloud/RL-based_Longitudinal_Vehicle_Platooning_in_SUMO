@@ -103,7 +103,13 @@ class Workspace(object):
 
             while not done:
                 actions = self.multi_agent.act(obs, sample=False, mode="eval")
-                obs, rewards, done, _ = self.env.step(actions)
+                for agent in self.agent_ids:
+                    actions[agent] = utils.scale_action(-1, 1,
+                                                        float(self.env.action_space[self.agent_ids[0]].low.min()),
+                                                        float(self.env.action_space[self.agent_ids[0]].high.max()), 
+                                                        actions[agent])
+                obs, rewards, dones, _ = self.env.step(actions)
+                done = dones['__all__']
                 for agent in self.agent_ids:
                     episode_rewards[agent] += rewards[agent]
                 episode_step += 1
@@ -137,6 +143,12 @@ class Workspace(object):
                     actions[agent] = self.env.action_space[agent].sample()
             else:
                 actions = self.multi_agent.act(obs, sample=True, mode="eval")
+                #scale actions to the action ranges of the environmnent
+                for agent in self.agent_ids:
+                    actions[agent] = utils.scale_action(-1, 1,
+                                                        float(self.env.action_space[self.agent_ids[0]].low.min()),
+                                                        float(self.env.action_space[self.agent_ids[0]].high.max()), 
+                                                        actions[agent])
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:
@@ -145,15 +157,22 @@ class Workspace(object):
                 else:
                     self.multi_agent.federate(self.cfg.fed_pre_weight, self.cfg.fed_post_weight)
 
-            next_obs, rewards, done, _ = self.env.step(actions)
+            # advance one step in the environment
+            next_obs, rewards, dones, _ = self.env.step(actions)
             
             # allow infinite bootstrap
-            done = float(done)
-            done_no_max = 0 if episode_step + 1 == self.env.horizon else done
+            done = float(dones['__all__'])
+            dones_no_max = {}
             for agent in self.agent_ids:
+                dones_no_max[agent] = 0 if episode_step + 1 == self.env.horizon else dones[agent]
                 episode_rewards[agent] += rewards[agent]
 
-            self.multi_agent.add_to_buffer(obs, actions, rewards, next_obs, done, done_no_max)
+            # scale actions back to the range of the actor
+            for agent in self.agent_ids:
+                actions[agent] = utils.scale_action(float(self.env.action_space[self.agent_ids[0]].low.min()),
+                                                    float(self.env.action_space[self.agent_ids[0]].high.max()),
+                                                    -1, 1, actions[agent])
+            self.multi_agent.add_to_buffer(obs, actions, rewards, next_obs, done, dones_no_max)
 
             obs = next_obs
             episode_step += 1

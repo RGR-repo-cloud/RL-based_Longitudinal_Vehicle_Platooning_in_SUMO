@@ -12,20 +12,20 @@ render: false
 
 load_checkpoint: false
 save_checkpoint: true
-checkpoint_frequency: ${num_train_steps}
+checkpoint_frequency: 50000 #${num_train_steps}
 
-run_directory: 2024-01-18/14-15
-checkpoint: cp_12043
+run_directory: 2024-01-20/20-54
+checkpoint: cp_50507
 
-num_train_steps: 12000
+num_train_steps: 100000
 replay_buffer_capacity: 50000 #${num_train_steps}
 
 num_seed_steps: 600
 
-eval_frequency: 1000
+eval_frequency: 10000
 num_eval_episodes: 1
 
-fed_enabled: true
+fed_enabled: false
 fed_frequency: 12
 
 fed_pre_weight: 0.34

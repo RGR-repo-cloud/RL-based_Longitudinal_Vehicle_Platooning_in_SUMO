@@ -94,7 +94,7 @@ class FlowEnv(gym.Env):
         """
         obs, reward, done, infos = self.wrapped_env.step(action)
 
-        return obs, reward, done["__all__"], infos
+        return obs, reward, done, infos
 
     def reset(self):
         """Reset the environment."""
@@ -204,6 +204,7 @@ def mlp(input_dim, hidden_dim, output_dim, hidden_depth, output_mod=None):
         mods.append(output_mod)
     trunk = nn.Sequential(*mods)
     return trunk
+
 
 def to_np(t):
     if t is None:
