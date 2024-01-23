@@ -1,0 +1,14 @@
+env: platoon_exp
+
+controller: Fastbed
+
+render: False
+
+num_eval_episodes: 1
+
+
+# hydra configuration
+hydra:
+    name: ${env}
+    run:
+        dir: ./ext_eval

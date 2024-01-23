@@ -12,12 +12,12 @@ render: false
 
 load_checkpoint: false
 save_checkpoint: true
-checkpoint_frequency: 50000 #${num_train_steps}
+checkpoint_frequency: 50000
 
-run_directory: 2024-01-20/20-54
-checkpoint: cp_50507
+run_directory: 2024-01-21/10-42
+checkpoint: cp_50514
 
-num_train_steps: 100000
+num_train_steps: 150000
 replay_buffer_capacity: 50000 #${num_train_steps}
 
 num_seed_steps: 600
@@ -26,10 +26,13 @@ eval_frequency: 10000
 num_eval_episodes: 1
 
 fed_enabled: false
-fed_frequency: 12
-
+fed_frequency: 6
 fed_pre_weight: 0.34
 fed_post_weight: 0.16
+fed_actor: false
+fed_critic: true
+fed_target: true
+
 
 # "cuda" or "cpu"
 device: cuda

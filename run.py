@@ -155,7 +155,7 @@ class Workspace(object):
                 if not self.cfg.fed_enabled or not session_step % self.cfg.fed_frequency == 0 or self.cfg.multi_agent_mode == 'shared':
                     self.multi_agent.update(self.loggers, self.step)
                 else:
-                    self.multi_agent.federate(self.cfg.fed_pre_weight, self.cfg.fed_post_weight)
+                    self.multi_agent.federate(self.cfg.fed_pre_weight, self.cfg.fed_post_weight, self.cfg.fed_actor, self.cfg.fed_critic, self.cfg.fed_target)
 
             # advance one step in the environment
             next_obs, rewards, dones, _ = self.env.step(actions)
@@ -181,7 +181,7 @@ class Workspace(object):
 
 
             if done:
-
+                
                 for agent in self.agent_ids:
                     self.loggers[agent].log('train/duration',
                                         time.time() - start_time, self.step)
