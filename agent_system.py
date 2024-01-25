@@ -99,7 +99,7 @@ class IndividualMultiAgent(MultiAgent):
             self.agents[agent].update(self.replay_buffers[agent], loggers[agent], step)
 
 
-    def federate(self, pre_weight, post_weight, aggregate_actor, aggregate_critic, aggregate_target):
+    def federate(self, pre_weight, post_weight, aggregate_actor, aggregate_critic, aggregate_target, aggregate_alpha):
 
             with torch.no_grad():
                 
@@ -132,6 +132,9 @@ class IndividualMultiAgent(MultiAgent):
                         orig_weights[agent]['target_Q2'] = []
                         for weight in self.agents[agent].critic_target.Q2.parameters():
                             orig_weights[agent]['target_Q2'].append(weight.detach())
+
+                    if aggregate_alpha:
+                        orig_weights[agent]['log_alpha'] = self.agents[agent].log_alpha.detach()
 
 
                 temp_weights = {}
@@ -167,6 +170,10 @@ class IndividualMultiAgent(MultiAgent):
                             for weight_id in range(len(orig_weights[agent]['target_Q2'])):
                                 temp_weights[agent]['target_Q2'].append((1 - post_weight) * orig_weights[agent]['target_Q2'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['target_Q2'][weight_id])
 
+                        if aggregate_alpha:
+                            temp_weights[agent]['log_alpha'] = (1 - post_weight) * orig_weights[agent]['log_alpha'] + post_weight * orig_weights[self.agent_ids[id+1]]['log_alpha']
+                        
+
                     # if last follower
                     elif id == len(self.agent_ids) - 1:
                         
@@ -193,6 +200,9 @@ class IndividualMultiAgent(MultiAgent):
                             for weight_id in range(len(orig_weights[agent]['target_Q2'])):
                                 temp_weights[agent]['target_Q2'].append((1 - pre_weight) * orig_weights[agent]['target_Q2'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q2'][weight_id])
 
+                        if aggregate_alpha:
+                            temp_weights[agent]['log_alpha'] = (1 - pre_weight) * orig_weights[agent]['log_alpha'] + pre_weight * orig_weights[self.agent_ids[id-1]]['log_alpha']
+
                     else:
                         
                         if aggregate_actor:
@@ -218,6 +228,8 @@ class IndividualMultiAgent(MultiAgent):
                             for weight_id in range(len(orig_weights[agent]['target_Q2'])):
                                 temp_weights[agent]['target_Q2'].append((1 - pre_weight - post_weight) * orig_weights[agent]['target_Q2'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q2'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['target_Q2'][weight_id])
 
+                        if aggregate_alpha:
+                            temp_weights[agent]['log_alpha'] = (1 - pre_weight - post_weight) * orig_weights[agent]['log_alpha'] + pre_weight * orig_weights[self.agent_ids[id-1]]['log_alpha'] + post_weight * orig_weights[self.agent_ids[id+1]]['log_alpha']
                 
                 # update weights
                 
@@ -241,6 +253,8 @@ class IndividualMultiAgent(MultiAgent):
                         for param, weight in zip(self.agents[agent].critic_target.Q2.parameters(), temp_weights[agent]['target_Q2']):
                             param.copy_(weight)
 
+                    if aggregate_alpha:
+                        self.agents[agent].log_alpha.copy_(temp_weights[agent]['log_alpha'])
 
                     
 
