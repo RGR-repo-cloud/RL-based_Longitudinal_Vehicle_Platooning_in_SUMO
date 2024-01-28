@@ -63,6 +63,13 @@ class IndividualMultiAgent(MultiAgent):
         self.agents = ModuleDict(agents)
 
 
+    def equalize_agents(self):
+
+        for agent in self.agent_ids:
+            for param, target_param in zip(self.agents[self.agent_ids[0]].parameters(), self.agents[agent].parameters()):
+                target_param.data.copy_(param.data)
+
+
     def reset(self):
 
         for agent in self.agent_ids:
@@ -99,7 +106,7 @@ class IndividualMultiAgent(MultiAgent):
             self.agents[agent].update(self.replay_buffers[agent], loggers[agent], step)
 
 
-    def federate(self, pre_weight, post_weight, aggregate_actor, aggregate_critic, aggregate_target, aggregate_alpha):
+    def federate(self, aggregate_actor, aggregate_critic, aggregate_target, aggregate_alpha, pre_weight, post_weight, first_post_weight, last_pre_weight):
 
             with torch.no_grad():
                 
@@ -144,34 +151,34 @@ class IndividualMultiAgent(MultiAgent):
 
                     temp_weights[agent] = {}
 
-                    # if leader    
+                    # if first follower    
                     if id == 0:
                         
                         if aggregate_actor:
                             temp_weights[agent]['actor'] = []
                             for weight_id in range(len(orig_weights[agent]['actor'])):
-                                temp_weights[agent]['actor'].append((1 - post_weight) * orig_weights[agent]['actor'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['actor'][weight_id])
+                                temp_weights[agent]['actor'].append((1 - first_post_weight) * orig_weights[agent]['actor'][weight_id] + first_post_weight * orig_weights[self.agent_ids[id+1]]['actor'][weight_id])
                             
                         if aggregate_critic:
                             temp_weights[agent]['critic_Q1'] = []
                             for weight_id in range(len(orig_weights[agent]['critic_Q1'])):
-                                temp_weights[agent]['critic_Q1'].append((1 - post_weight) * orig_weights[agent]['critic_Q1'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['critic_Q1'][weight_id])
+                                temp_weights[agent]['critic_Q1'].append((1 - first_post_weight) * orig_weights[agent]['critic_Q1'][weight_id] + first_post_weight * orig_weights[self.agent_ids[id+1]]['critic_Q1'][weight_id])
 
                             temp_weights[agent]['critic_Q2'] = []
                             for weight_id in range(len(orig_weights[agent]['critic_Q2'])):
-                                temp_weights[agent]['critic_Q2'].append((1 - post_weight) * orig_weights[agent]['critic_Q2'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['critic_Q2'][weight_id])
+                                temp_weights[agent]['critic_Q2'].append((1 - first_post_weight) * orig_weights[agent]['critic_Q2'][weight_id] + first_post_weight * orig_weights[self.agent_ids[id+1]]['critic_Q2'][weight_id])
 
                         if aggregate_target:
                             temp_weights[agent]['target_Q1'] = []
                             for weight_id in range(len(orig_weights[agent]['target_Q1'])):
-                                temp_weights[agent]['target_Q1'].append((1 - post_weight) * orig_weights[agent]['target_Q1'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['target_Q1'][weight_id])
+                                temp_weights[agent]['target_Q1'].append((1 - first_post_weight) * orig_weights[agent]['target_Q1'][weight_id] + first_post_weight * orig_weights[self.agent_ids[id+1]]['target_Q1'][weight_id])
 
                             temp_weights[agent]['target_Q2'] = []
                             for weight_id in range(len(orig_weights[agent]['target_Q2'])):
-                                temp_weights[agent]['target_Q2'].append((1 - post_weight) * orig_weights[agent]['target_Q2'][weight_id] + post_weight * orig_weights[self.agent_ids[id+1]]['target_Q2'][weight_id])
+                                temp_weights[agent]['target_Q2'].append((1 - first_post_weight) * orig_weights[agent]['target_Q2'][weight_id] + first_post_weight * orig_weights[self.agent_ids[id+1]]['target_Q2'][weight_id])
 
                         if aggregate_alpha:
-                            temp_weights[agent]['log_alpha'] = (1 - post_weight) * orig_weights[agent]['log_alpha'] + post_weight * orig_weights[self.agent_ids[id+1]]['log_alpha']
+                            temp_weights[agent]['log_alpha'] = (1 - first_post_weight) * orig_weights[agent]['log_alpha'] + first_post_weight * orig_weights[self.agent_ids[id+1]]['log_alpha']
                         
 
                     # if last follower
@@ -180,28 +187,28 @@ class IndividualMultiAgent(MultiAgent):
                         if aggregate_actor:
                             temp_weights[agent]['actor'] = []
                             for weight_id in range(len(orig_weights[agent]['actor'])):
-                                temp_weights[agent]['actor'].append((1 - pre_weight) * orig_weights[agent]['actor'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['actor'][weight_id])
+                                temp_weights[agent]['actor'].append((1 - last_pre_weight) * orig_weights[agent]['actor'][weight_id] + last_pre_weight * orig_weights[self.agent_ids[id-1]]['actor'][weight_id])
                             
                         if aggregate_critic:
                             temp_weights[agent]['critic_Q1'] = []
                             for weight_id in range(len(orig_weights[agent]['critic_Q1'])):
-                                temp_weights[agent]['critic_Q1'].append((1 - pre_weight) * orig_weights[agent]['critic_Q1'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['critic_Q1'][weight_id])
+                                temp_weights[agent]['critic_Q1'].append((1 - last_pre_weight) * orig_weights[agent]['critic_Q1'][weight_id] + last_pre_weight * orig_weights[self.agent_ids[id-1]]['critic_Q1'][weight_id])
 
                             temp_weights[agent]['critic_Q2'] = []
                             for weight_id in range(len(orig_weights[agent]['critic_Q2'])):
-                                temp_weights[agent]['critic_Q2'].append((1 - pre_weight) * orig_weights[agent]['critic_Q2'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['critic_Q2'][weight_id])
+                                temp_weights[agent]['critic_Q2'].append((1 - last_pre_weight) * orig_weights[agent]['critic_Q2'][weight_id] + last_pre_weight * orig_weights[self.agent_ids[id-1]]['critic_Q2'][weight_id])
 
                         if aggregate_target:
                             temp_weights[agent]['target_Q1'] = []
                             for weight_id in range(len(orig_weights[agent]['target_Q1'])):
-                                temp_weights[agent]['target_Q1'].append((1 - pre_weight) * orig_weights[agent]['target_Q1'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q1'][weight_id])
+                                temp_weights[agent]['target_Q1'].append((1 - last_pre_weight) * orig_weights[agent]['target_Q1'][weight_id] + last_pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q1'][weight_id])
 
                             temp_weights[agent]['target_Q2'] = []
                             for weight_id in range(len(orig_weights[agent]['target_Q2'])):
-                                temp_weights[agent]['target_Q2'].append((1 - pre_weight) * orig_weights[agent]['target_Q2'][weight_id] + pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q2'][weight_id])
+                                temp_weights[agent]['target_Q2'].append((1 - last_pre_weight) * orig_weights[agent]['target_Q2'][weight_id] + last_pre_weight * orig_weights[self.agent_ids[id-1]]['target_Q2'][weight_id])
 
                         if aggregate_alpha:
-                            temp_weights[agent]['log_alpha'] = (1 - pre_weight) * orig_weights[agent]['log_alpha'] + pre_weight * orig_weights[self.agent_ids[id-1]]['log_alpha']
+                            temp_weights[agent]['log_alpha'] = (1 - last_pre_weight) * orig_weights[agent]['log_alpha'] + last_pre_weight * orig_weights[self.agent_ids[id-1]]['log_alpha']
 
                     else:
                         

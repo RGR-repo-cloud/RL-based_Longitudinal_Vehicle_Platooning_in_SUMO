@@ -65,6 +65,9 @@ class Workspace(object):
                                         float(self.env.action_space[agent].high.max())]
                 
             self.multi_agent = IndividualMultiAgent(self.cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(self.cfg.replay_buffer_capacity), self.device, self.cfg.mode, self.cfg.agent)
+
+            if self.cfg.fed_enabled:
+                self.multi_agent.equalize_agents()
         
         elif self.cfg.multi_agent_mode == 'shared':
             
@@ -155,7 +158,7 @@ class Workspace(object):
                 if not self.cfg.fed_enabled or not session_step % self.cfg.fed_frequency == 0 or self.cfg.multi_agent_mode == 'shared':
                     self.multi_agent.update(self.loggers, self.step)
                 else:
-                    self.multi_agent.federate(self.cfg.fed_pre_weight, self.cfg.fed_post_weight, self.cfg.fed_actor, self.cfg.fed_critic, self.cfg.fed_target, self.cfg.fed_alpha)
+                    self.multi_agent.federate(self.cfg.fed_actor, self.cfg.fed_critic, self.cfg.fed_target, self.cfg.fed_alpha, self.cfg.fed_pre_weight, self.cfg.fed_post_weight, self.cfg.fed_first_post_weight, self.cfg.fed_last_pre_weight)
 
             # advance one step in the environment
             next_obs, rewards, dones, _ = self.env.step(actions)
