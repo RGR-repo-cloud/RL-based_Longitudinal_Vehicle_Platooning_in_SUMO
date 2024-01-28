@@ -26,6 +26,7 @@ eval_frequency: 10000
 num_eval_episodes: 1
 
 fed_enabled: true
+fed_and_update: false
 fed_actor: true
 fed_critic: true
 fed_target: true

@@ -155,9 +155,11 @@ class Workspace(object):
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:
-                if not self.cfg.fed_enabled or not session_step % self.cfg.fed_frequency == 0 or self.cfg.multi_agent_mode == 'shared':
+                if not (self.cfg.fed_enabled and session_step % self.cfg.fed_frequency == 0) or self.cfg.multi_agent_mode == 'shared':
                     self.multi_agent.update(self.loggers, self.step)
                 else:
+                    if self.cfg.fed_and_update:
+                        self.multi_agent.update(self.loggers, self.step)
                     self.multi_agent.federate(self.cfg.fed_actor, self.cfg.fed_critic, self.cfg.fed_target, self.cfg.fed_alpha, self.cfg.fed_pre_weight, self.cfg.fed_post_weight, self.cfg.fed_first_post_weight, self.cfg.fed_last_pre_weight)
 
             # advance one step in the environment
