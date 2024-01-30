@@ -5,6 +5,7 @@ env: platoon_exp
 
 # "shared" or "individual"
 multi_agent_mode: individual
+equalize_agents: true
 
 # "train" or "eval"
 mode: train
@@ -14,15 +15,15 @@ load_checkpoint: false
 save_checkpoint: true
 checkpoint_frequency: 50000
 
-run_directory: downloads/23-40
-checkpoint: cp_200124
+run_directory: downloads/10-21
+checkpoint: cp_50412
 
-num_train_steps: 50000
+num_train_steps: 10000
 replay_buffer_capacity: 50000 #${num_train_steps}
 
 num_seed_steps: 600
 
-eval_frequency: 10000
+eval_frequency: 1000
 num_eval_episodes: 1
 
 fed_enabled: true

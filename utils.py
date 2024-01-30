@@ -225,5 +225,13 @@ def scale_action(orig_min, orig_max, des_min, des_max, action):
 
     return action * range_factor + shift
 
+def print_accumulated_rewards(rewards):
+    reward_sum = 0
+    for agent in rewards.keys():
+        reward_sum += rewards[agent]
+    print("--------------------------------------")
+    print("Sum of rewards: " + str(reward_sum))
+    print("______________________________________")
+
 
 

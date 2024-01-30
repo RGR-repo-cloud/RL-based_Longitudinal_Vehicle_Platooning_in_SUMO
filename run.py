@@ -66,7 +66,7 @@ class Workspace(object):
                 
             self.multi_agent = IndividualMultiAgent(self.cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(self.cfg.replay_buffer_capacity), self.device, self.cfg.mode, self.cfg.agent)
 
-            if self.cfg.fed_enabled:
+            if self.cfg.equalize_agents:
                 self.multi_agent.equalize_agents()
         
         elif self.cfg.multi_agent_mode == 'shared':
@@ -97,8 +97,12 @@ class Workspace(object):
             average_episode_rewards[agent] = 0
         for episode in range(self.cfg.num_eval_episodes):
             episode_step = 0
+
+            self.env.wrapped_env.set_mode('eval')
+            self.env.wrapped_env.set_scenario(episode % self.env.wrapped_env.env_params.additional_params['num_scenarios'])
             obs = self.env.reset()
             self.multi_agent.reset()
+
             done = False
             episode_rewards = {}
             for agent in self.agent_ids:
@@ -126,14 +130,19 @@ class Workspace(object):
                         self.step)
             self.loggers[agent].dump(self.step)
 
+        utils.print_accumulated_rewards(average_episode_rewards)
+
 
     def train(self):
         episode_rewards, done,  = {}, False
         episode_step, session_step, eval_count, checkpoint_count = 0, 0, 0, 0
         for agent in self.agent_ids:
             episode_rewards[agent] = 0
+
+        self.env.wrapped_env.set_mode('train')
         obs = self.env.reset()
         self.multi_agent.reset()
+
         training_done = False # ensure that the last episode does not get interrupted
 
         while not training_done:
@@ -195,16 +204,19 @@ class Workspace(object):
                                            self.step)
                     self.loggers[agent].dump(
                                         self.step, save=(self.step > self.cfg.num_seed_steps))
+                utils.print_accumulated_rewards(episode_rewards)
                     
                 # evaluate agent periodically
                 if int(session_step / self.cfg.eval_frequency) > eval_count:
                     for agent in self.agent_ids:
                         self.loggers[agent].log('eval/episode', self.episode, self.step)
                     self.evaluate()
-                    eval_count +=1
-                    
+                    eval_count += 1
+                
+                self.env.wrapped_env.set_mode('train')
                 obs = self.env.reset()
                 self.multi_agent.reset()
+
                 done = False
                 for agent in self.agent_ids:
                     episode_rewards[agent] = 0
