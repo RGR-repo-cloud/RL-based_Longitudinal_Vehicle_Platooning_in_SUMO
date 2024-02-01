@@ -66,7 +66,7 @@ class Workspace(object):
                 
             self.multi_agent = IndividualMultiAgent(self.cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(self.cfg.replay_buffer_capacity), self.device, self.cfg.mode, self.cfg.agent)
 
-            if self.cfg.equalize_agents:
+            if self.cfg.equalize_agents and not cfg.load_checkpoint:
                 self.multi_agent.equalize_agents()
         
         elif self.cfg.multi_agent_mode == 'shared':
@@ -84,10 +84,11 @@ class Workspace(object):
 
         self.step = 0
         self.episode = 0
+        self.min_step_num = 0
         
         #load checkpoint
         if cfg.load_checkpoint:
-            self.step, self.episode = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint, self.cfg.device, int(self.cfg.replay_buffer_capacity))
+            self.step, self.episode, self.min_step_num = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint, self.cfg.device, int(self.cfg.replay_buffer_capacity))
         
 
 
@@ -135,7 +136,8 @@ class Workspace(object):
 
     def train(self):
         episode_rewards, done,  = {}, False
-        episode_step, session_step, eval_count, checkpoint_count = 0, 0, 0, 0
+        episode_step, eval_count, checkpoint_count = 0, 0, 0
+        virtual_session_step = self.step - self.min_step_num # for consistency reasons
         for agent in self.agent_ids:
             episode_rewards[agent] = 0
 
@@ -164,7 +166,7 @@ class Workspace(object):
 
             # run training update
             if self.step >= self.cfg.num_seed_steps:
-                if not (self.cfg.fed_enabled and session_step % self.cfg.fed_frequency == 0) or self.cfg.multi_agent_mode == 'shared':
+                if not (self.cfg.fed_enabled and self.step % self.cfg.fed_frequency == 0) or self.cfg.multi_agent_mode == 'shared':
                     self.multi_agent.update(self.loggers, self.step)
                 else:
                     if self.cfg.fed_and_update:
@@ -191,7 +193,7 @@ class Workspace(object):
             obs = next_obs
             episode_step += 1
             self.step += 1
-            session_step += 1
+            virtual_session_step += 1
 
 
             if done:
@@ -207,7 +209,7 @@ class Workspace(object):
                 utils.print_accumulated_rewards(episode_rewards)
                     
                 # evaluate agent periodically
-                if int(session_step / self.cfg.eval_frequency) > eval_count:
+                if int(virtual_session_step / self.cfg.eval_frequency) > eval_count:
                     for agent in self.agent_ids:
                         self.loggers[agent].log('eval/episode', self.episode, self.step)
                     self.evaluate()
@@ -225,8 +227,8 @@ class Workspace(object):
                 training_done = self.step >= self.cfg.num_train_steps
                 
                 #save models and optimizers
-                if self.cfg.save_checkpoint and int(session_step / self.cfg.checkpoint_frequency) > checkpoint_count:
-                    self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step, self.episode)
+                if self.cfg.save_checkpoint and int(virtual_session_step / self.cfg.checkpoint_frequency) > checkpoint_count:
+                    self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step, self.episode, self.cfg.num_train_steps)
                     checkpoint_count += 1
             
 

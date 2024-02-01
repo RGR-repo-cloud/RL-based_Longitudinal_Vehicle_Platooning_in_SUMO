@@ -52,7 +52,8 @@ class MetersGroup(object):
         self._csv_file_name = self._prepare_file(file_name, 'csv')
         self._formating = formating
         self._meters = defaultdict(AverageMeter)
-        if not file_exists:
+        self.file_exists = file_exists
+        if not self.file_exists:
             self._csv_file = open(self._csv_file_name, 'w')
         else:
             self._csv_file = open(self._csv_file_name, 'a')
@@ -84,7 +85,8 @@ class MetersGroup(object):
             self._csv_writer = csv.DictWriter(self._csv_file,
                                               fieldnames=sorted(data.keys()),
                                               restval=0.0)
-            self._csv_writer.writeheader()
+            if not self.file_exists:
+                self._csv_writer.writeheader()
         self._csv_writer.writerow(data)
         self._csv_file.flush()
 

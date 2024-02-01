@@ -6,6 +6,7 @@ from external_controllers.controllers import Fastbed
 
 import utils
 import hydra
+import numpy as np
 
 
 class Evaluator(object):
@@ -25,6 +26,9 @@ class Evaluator(object):
         self.env = utils.import_flow_env(env_name=self.cfg.env, render=self.cfg.render, evaluate=False)
         self.agent_ids = self.env.agents
 
+        self.act_range = [  float(self.env.action_space[self.agent_ids[0]].low.min()),
+                            float(self.env.action_space[self.agent_ids[0]].high.max())]
+
         self.controller = None
         if self.cfg.controller == "Fastbed":
             self.controller = Fastbed()
@@ -37,6 +41,8 @@ class Evaluator(object):
         for episode in range(self.cfg.num_eval_episodes):
             episode_step = 0
             
+            self.env.wrapped_env.set_mode('eval')
+            self.env.wrapped_env.set_scenario(episode % self.env.wrapped_env.env_params.additional_params['num_scenarios'])
             obs = self.env.reset()
             
             done = False
@@ -48,7 +54,7 @@ class Evaluator(object):
 
                 actions = {}
                 for agent in self.agent_ids:
-                    actions[agent] = self.controller.get_accel(obs[agent])
+                    actions[agent] = np.clip(self.controller.get_accel(obs[agent]), a_min=self.act_range[0], a_max=self.act_range[1])
                 
                 obs, rewards, dones, _ = self.env.step(actions)
                 
@@ -61,9 +67,12 @@ class Evaluator(object):
                 average_episode_rewards[agent] += episode_rewards[agent]
 
         for agent in self.agent_ids:
+            average_episode_rewards[agent] /= self.cfg.num_eval_episodes
             print("---------------------------------")
             print(agent)
             print(average_episode_rewards[agent])
+        
+        utils.print_accumulated_rewards(average_episode_rewards)
 
     
 @hydra.main(config_path='config/external_control_eval.yaml', strict=True)

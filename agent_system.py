@@ -282,6 +282,7 @@ class IndividualMultiAgent(MultiAgent):
         self.agents.load_state_dict(model_checkpoint['models'])
         step = model_checkpoint['step']
         episode = model_checkpoint['episode']
+        min_step_num = model_checkpoint['min_step_num']
       
         for agent in self.agent_ids:
             self.agents[agent].critic_optimizer.load_state_dict(model_checkpoint['optims'][agent]['critic'])
@@ -317,10 +318,10 @@ class IndividualMultiAgent(MultiAgent):
 
         print("loading checkpoint " + checkpoint + " finished")
 
-        return step, episode
+        return step, episode, min_step_num
     
 
-    def save_checkpoint(self, dir, step, episode):
+    def save_checkpoint(self, dir, step, episode, min_step_num):
 
         checkpoint = 'cp_{:d}'.format(step)
 
@@ -333,6 +334,7 @@ class IndividualMultiAgent(MultiAgent):
         state = {}
         state['step'] = step
         state['episode'] = episode
+        state['min_step_num'] = min_step_num
         state['models'] = self.agents.state_dict()
         state['optims'] = {}
         
@@ -428,7 +430,7 @@ class SharedMultiAgent(MultiAgent):
             self.replay_buffer.add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, dones_no_max[agent])
 
 
-    def save_checkpoint(self, dir, step, episode):
+    def save_checkpoint(self, dir, step, episode, min_step_num):
         
         checkpoint = 'cp_{:d}'.format(step)
 
@@ -441,6 +443,7 @@ class SharedMultiAgent(MultiAgent):
         state = {}
         state['step'] = step
         state['episode'] = episode
+        state['min_step_num'] = min_step_num
         state['models'] = self.agent.state_dict()
         state['optims'] = {}
     
@@ -479,6 +482,7 @@ class SharedMultiAgent(MultiAgent):
         self.agent.load_state_dict(model_checkpoint['models'])
         step = model_checkpoint['step']
         episode = model_checkpoint['episode']
+        min_step_num = model_checkpoint['min_step_num']
       
         self.agent.critic_optimizer.load_state_dict(model_checkpoint['optims']['critic'])
         self.agent.actor_optimizer.load_state_dict(model_checkpoint['optims']['actor'])
@@ -510,7 +514,7 @@ class SharedMultiAgent(MultiAgent):
 
         print("loading checkpoint " + checkpoint + " finished")
 
-        return step, episode
+        return step, episode, min_step_num
             
             
 

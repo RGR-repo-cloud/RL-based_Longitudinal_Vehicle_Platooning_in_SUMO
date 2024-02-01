@@ -2,9 +2,9 @@ env: platoon_exp
 
 controller: Fastbed
 
-render: False
+render: false
 
-num_eval_episodes: 1
+num_eval_episodes: 6
 
 
 # hydra configuration
