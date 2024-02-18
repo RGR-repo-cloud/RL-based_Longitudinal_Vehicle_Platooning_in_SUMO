@@ -22,9 +22,11 @@ from agent_system import IndividualMultiAgent, SharedMultiAgent
 class Workspace(object):
     def __init__(self, cfg):
 
+        self.cfg = cfg
+
         #change working directory to location of checkpoint or create new one
-        if cfg.load_checkpoint:
-            os.chdir(os.path.join(os.getcwd(), cfg.run_directory))
+        if self.cfg.load_checkpoint:
+            os.chdir(os.path.join(os.getcwd(), self.cfg.run_directory))
         else:
             dir = os.path.join(os.getcwd(), datetime.datetime.now().strftime('%Y-%m-%d'), datetime.datetime.now().strftime('%H-%M'))
             Path(dir).mkdir(parents=True, exist_ok=True)
@@ -33,14 +35,11 @@ class Workspace(object):
         self.work_dir = os.getcwd()
         print(f'workspace: {self.work_dir}')
 
-        self.cfg = cfg
-
-        utils.set_seed_everywhere(cfg.seed)
-        self.device = torch.device(cfg.device)
+        utils.set_seed_everywhere(self.cfg.seed)
+        self.device = torch.device(self.cfg.device)
         
         #register environment
         self.env = utils.import_flow_env(env_name=self.cfg.env, render=self.cfg.render, evaluate=False)
-        #self.env.seed(self.cfg.seed)
         self.agent_ids = self.env.agents
 
         #initialize loggers
@@ -48,10 +47,10 @@ class Workspace(object):
         for agent in self.agent_ids:
             self.loggers[agent] = Logger(   self.work_dir,
                                             agent_id=agent,
-                                            save_tb=cfg.log_save_tb,
-                                            log_frequency=cfg.log_frequency,
+                                            save_tb=self.cfg.log_save_tb,
+                                            log_frequency=self.cfg.log_frequency,
                                             agent=self.cfg.agent.name,
-                                            file_exists=cfg.load_checkpoint)
+                                            file_exists=self.cfg.load_checkpoint)
         
         #initialize agents
         if self.cfg.multi_agent_mode == 'individual':
@@ -66,7 +65,7 @@ class Workspace(object):
                 
             self.multi_agent = IndividualMultiAgent(self.cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(self.cfg.replay_buffer_capacity), self.device, self.cfg.mode, self.cfg.agent)
 
-            if self.cfg.equalize_agents and not cfg.load_checkpoint:
+            if self.cfg.equalize_agents and not self.cfg.load_checkpoint:
                 self.multi_agent.equalize_agents()
         
         elif self.cfg.multi_agent_mode == 'shared':
@@ -87,7 +86,7 @@ class Workspace(object):
         self.min_step_num = 0
         
         #load checkpoint
-        if cfg.load_checkpoint:
+        if self.cfg.load_checkpoint:
             self.step, self.episode, self.min_step_num = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint, self.cfg.device, int(self.cfg.replay_buffer_capacity))
         
 
@@ -154,7 +153,8 @@ class Workspace(object):
             if self.step < self.cfg.num_seed_steps:
                 actions = {}
                 for agent in self.agent_ids:
-                    actions[agent] = self.env.action_space[agent].sample()
+                    actions[agent] = np.random.uniform(low=float(self.env.action_space[self.agent_ids[0]].low.min()),
+                                                       high=float(self.env.action_space[self.agent_ids[0]].high.max()))
             else:
                 actions = self.multi_agent.act(obs, sample=True, mode="eval")
                 #scale actions to the action ranges of the environmnent
@@ -228,7 +228,8 @@ class Workspace(object):
                 
                 #save models and optimizers
                 if self.cfg.save_checkpoint and int(virtual_session_step / self.cfg.checkpoint_frequency) > checkpoint_count:
-                    self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step, self.episode, self.cfg.num_train_steps)
+                    self.min_step_num += self.cfg.checkpoint_frequency
+                    self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step, self.episode, self.min_step_num)
                     checkpoint_count += 1
             
 
