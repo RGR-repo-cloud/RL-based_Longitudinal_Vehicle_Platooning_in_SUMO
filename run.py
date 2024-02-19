@@ -35,7 +35,10 @@ class Workspace(object):
         self.work_dir = os.getcwd()
         print(f'workspace: {self.work_dir}')
 
-        utils.set_seed_everywhere(self.cfg.seed)
+        # for comparison reasons
+        utils.set_seed_everywhere(self.cfg.overall_seed)
+        self.initial_actions_randomizer = np.random.default_rng(seed=self.cfg.initial_actions_seed)
+        
         self.device = torch.device(self.cfg.device)
         
         #register environment
@@ -80,7 +83,7 @@ class Workspace(object):
   
         else:
             raise Exception('no valid multiagent_mode')
-
+        
         self.step = 0
         self.episode = 0
         self.min_step_num = 0
@@ -153,8 +156,8 @@ class Workspace(object):
             if self.step < self.cfg.num_seed_steps:
                 actions = {}
                 for agent in self.agent_ids:
-                    actions[agent] = np.random.uniform(low=float(self.env.action_space[self.agent_ids[0]].low.min()),
-                                                       high=float(self.env.action_space[self.agent_ids[0]].high.max()))
+                    actions[agent] = self.initial_actions_randomizer.uniform(low=float(self.env.action_space[self.agent_ids[0]].low.min()),
+                                                                            high=float(self.env.action_space[self.agent_ids[0]].high.max()))
             else:
                 actions = self.multi_agent.act(obs, sample=True, mode="eval")
                 #scale actions to the action ranges of the environmnent
