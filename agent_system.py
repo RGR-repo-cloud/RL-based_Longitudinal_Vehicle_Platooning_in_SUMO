@@ -38,11 +38,12 @@ class MultiAgent(ABC):
 
 class IndividualMultiAgent(MultiAgent):
 
-    def __init__(self, cfg, agent_ids, obs_spaces, act_spaces, act_ranges, replay_buffer_cap, device, mode, learning_model):
+    def __init__(self, cfg, agent_ids, obs_spaces, act_spaces, act_ranges, replay_buffer_cap, device, mode, learning_model, randomizer):
 
         self.agent_ids = agent_ids
         self.device = device
         self.mode = mode
+        self.randomizer = randomizer
 
         #instantiate agents and buffers
         self.replay_buffers = {}
@@ -58,7 +59,8 @@ class IndividualMultiAgent(MultiAgent):
             self.replay_buffers[agent] = ReplayBuffer(  obs_spaces[agent],
                                                         act_spaces[agent],
                                                         replay_buffer_cap,
-                                                        self.device)
+                                                        self.device,
+                                                        self.randomizer)
         
         self.agents = ModuleDict(agents)
 
@@ -370,11 +372,12 @@ class IndividualMultiAgent(MultiAgent):
 
 class SharedMultiAgent(MultiAgent):
 
-    def __init__(self, cfg, agent_ids, obs_space, act_space, act_range, replay_buffer_cap, device, mode, learning_model):
+    def __init__(self, cfg, agent_ids, obs_space, act_space, act_range, replay_buffer_cap, device, mode, learning_model, randomizer):
         
         self.agent_ids = agent_ids
         self.device = device
         self.mode = mode
+        self.randomizer = randomizer
 
         #instantiate agent and buffer
         cfg.agent.params.obs_dim = obs_space[0]
@@ -385,7 +388,8 @@ class SharedMultiAgent(MultiAgent):
         self.replay_buffer = ReplayBuffer(  obs_space,
                                             act_space,
                                             replay_buffer_cap,
-                                            self.device)
+                                            self.device,
+                                            self.randomizer)
         
 
     def reset(self):

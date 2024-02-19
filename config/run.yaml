@@ -46,8 +46,8 @@ device: cuda
 log_frequency: 600
 log_save_tb: true
 
-overall_seed: 1
-initial_actions_seed: 1
+overall_seed: 2
+initial_seed: 1
 
 
 # hydra configuration

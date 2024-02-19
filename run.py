@@ -37,7 +37,7 @@ class Workspace(object):
 
         # for comparison reasons
         utils.set_seed_everywhere(self.cfg.overall_seed)
-        self.initial_actions_randomizer = np.random.default_rng(seed=self.cfg.initial_actions_seed)
+        self.initial_randomizer = np.random.default_rng(seed=self.cfg.initial_seed)
         
         self.device = torch.device(self.cfg.device)
         
@@ -66,7 +66,7 @@ class Workspace(object):
                 act_ranges[agent] = [   float(self.env.action_space[agent].low.min()),
                                         float(self.env.action_space[agent].high.max())]
                 
-            self.multi_agent = IndividualMultiAgent(self.cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(self.cfg.replay_buffer_capacity), self.device, self.cfg.mode, self.cfg.agent)
+            self.multi_agent = IndividualMultiAgent(self.cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(self.cfg.replay_buffer_capacity), self.device, self.cfg.mode, self.cfg.agent, self.initial_randomizer)
 
             if self.cfg.equalize_agents and not self.cfg.load_checkpoint:
                 self.multi_agent.equalize_agents()
@@ -79,7 +79,7 @@ class Workspace(object):
             act_range = [   float(self.env.action_space[self.agent_ids[0]].low.min()),
                             float(self.env.action_space[self.agent_ids[0]].high.max())]
                 
-            self.multi_agent = SharedMultiAgent(self.cfg, self.agent_ids, obs_space, act_space, act_range, int(self.cfg.replay_buffer_capacity)*len(self.agent_ids), self.device, self.cfg.mode, self.cfg.agent)
+            self.multi_agent = SharedMultiAgent(self.cfg, self.agent_ids, obs_space, act_space, act_range, int(self.cfg.replay_buffer_capacity)*len(self.agent_ids), self.device, self.cfg.mode, self.cfg.agent, self.initial_randomizer)
   
         else:
             raise Exception('no valid multiagent_mode')
@@ -156,7 +156,7 @@ class Workspace(object):
             if self.step < self.cfg.num_seed_steps:
                 actions = {}
                 for agent in self.agent_ids:
-                    actions[agent] = self.initial_actions_randomizer.uniform(low=float(self.env.action_space[self.agent_ids[0]].low.min()),
+                    actions[agent] = self.initial_randomizer.uniform(low=float(self.env.action_space[self.agent_ids[0]].low.min()),
                                                                             high=float(self.env.action_space[self.agent_ids[0]].high.max()))
             else:
                 actions = self.multi_agent.act(obs, sample=True, mode="eval")
