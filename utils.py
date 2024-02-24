@@ -81,11 +81,7 @@ class FlowEnv(gym.Env):
     @property
     def observation_space(self):
         """See wrapped environment."""
-        if self.multiagent:
-            return {
-                key: self.wrapped_env.observation_space for key in self.agents}
-        else:
-            return self.wrapped_env.observation_space
+        return self.wrapped_env.observation_space
 
     def step(self, action):
         """See wrapped environment.

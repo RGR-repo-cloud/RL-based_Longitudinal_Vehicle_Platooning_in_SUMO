@@ -47,6 +47,7 @@ class Workspace(object):
 
         #initialize loggers
         self.loggers = {}
+        self.optim_loggers = None
         for agent in self.agent_ids:
             self.loggers[agent] = Logger(   self.work_dir,
                                             agent_id=agent,
@@ -54,8 +55,9 @@ class Workspace(object):
                                             log_frequency=self.cfg.log_frequency,
                                             agent=self.cfg.agent.name,
                                             file_exists=self.cfg.load_checkpoint)
-        
+            
         #initialize agents
+        self.multi_agent = None
         if self.cfg.multi_agent_mode == 'individual':
             
             #initialize input and output parameters
@@ -66,10 +68,12 @@ class Workspace(object):
                 act_ranges[agent] = [   float(self.env.action_space[agent].low.min()),
                                         float(self.env.action_space[agent].high.max())]
                 
-            self.multi_agent = IndividualMultiAgent(self.cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(self.cfg.replay_buffer_capacity), self.device, self.cfg.mode, self.cfg.agent, self.initial_randomizer)
+            self.multi_agent = IndividualMultiAgent(self.cfg, self.agent_ids, obs_spaces, act_spaces, act_ranges, int(self.cfg.replay_buffer_capacity), self.device, self.cfg.mode, self.cfg.agent, self.initial_randomizer, self.cfg.control_mode)
 
             if self.cfg.equalize_agents and not self.cfg.load_checkpoint:
                 self.multi_agent.equalize_agents()
+
+            self.optim_loggers = self.loggers
         
         elif self.cfg.multi_agent_mode == 'shared':
             
@@ -80,7 +84,14 @@ class Workspace(object):
                             float(self.env.action_space[self.agent_ids[0]].high.max())]
                 
             self.multi_agent = SharedMultiAgent(self.cfg, self.agent_ids, obs_space, act_space, act_range, int(self.cfg.replay_buffer_capacity)*len(self.agent_ids), self.device, self.cfg.mode, self.cfg.agent, self.initial_randomizer)
-  
+
+            self.optim_loggers = Logger( self.work_dir,
+                                            agent_id='optimization',
+                                            save_tb=self.cfg.log_save_tb,
+                                            log_frequency=self.cfg.log_frequency,
+                                            agent=self.cfg.agent.name,
+                                            file_exists=self.cfg.load_checkpoint)
+
         else:
             raise Exception('no valid multiagent_mode')
         
@@ -170,10 +181,10 @@ class Workspace(object):
             # run training update
             if self.step >= self.cfg.num_seed_steps:
                 if not (self.cfg.fed_enabled and self.step % self.cfg.fed_frequency == 0) or self.cfg.multi_agent_mode == 'shared':
-                    self.multi_agent.update(self.loggers, self.step)
+                    self.multi_agent.update(self.optim_loggers, self.step)
                 else:
                     if self.cfg.fed_and_update:
-                        self.multi_agent.update(self.loggers, self.step)
+                        self.multi_agent.update(self.optim_loggers, self.step)
                     self.multi_agent.federate(self.cfg.fed_actor, self.cfg.fed_critic, self.cfg.fed_target, self.cfg.fed_alpha, self.cfg.fed_pre_weight, self.cfg.fed_post_weight, self.cfg.fed_first_post_weight, self.cfg.fed_last_pre_weight)
 
             # advance one step in the environment
@@ -209,6 +220,11 @@ class Workspace(object):
                                            self.step)
                     self.loggers[agent].dump(
                                         self.step, save=(self.step > self.cfg.num_seed_steps))
+                
+                # in case of a shared multi_agent
+                if self.optim_loggers != self.loggers:
+                    self.optim_loggers.dump(self.step, save=(self.step > self.cfg.num_seed_steps))
+
                 utils.print_accumulated_rewards(episode_rewards)
                     
                 # evaluate agent periodically
