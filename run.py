@@ -101,7 +101,11 @@ class Workspace(object):
         
         #load checkpoint
         if self.cfg.load_checkpoint:
-            self.step, self.episode, self.min_step_num = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint, self.cfg.device, int(self.cfg.replay_buffer_capacity))
+            self.step, self.episode, self.min_step_num, env_randomizer_state, initial_randomizer_state, torch_randomizer_state, cuda_randomizer_state = self.multi_agent.load_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.cfg.checkpoint, self.cfg.device, int(self.cfg.replay_buffer_capacity))
+            
+            self.env.wrapped_env.load_randomizer_state(env_randomizer_state)
+            self.initial_randomizer.bit_generator.state = initial_randomizer_state
+            utils.load_randomizer_states(torch_randomizer_state, cuda_randomizer_state)
         
 
 
@@ -233,10 +237,6 @@ class Workspace(object):
                         self.loggers[agent].log('eval/episode', self.episode, self.step)
                     self.evaluate()
                     eval_count += 1
-                
-                self.env.wrapped_env.set_mode('train')
-                obs = self.env.reset()
-                self.multi_agent.reset()
 
                 done = False
                 for agent in self.agent_ids:
@@ -248,8 +248,12 @@ class Workspace(object):
                 #save models and optimizers
                 if self.cfg.save_checkpoint and int(virtual_session_step / self.cfg.checkpoint_frequency) > checkpoint_count:
                     self.min_step_num += self.cfg.checkpoint_frequency
-                    self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step, self.episode, self.min_step_num)
+                    self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step, self.episode, self.min_step_num, self.env.wrapped_env.episode_randomizer.bit_generator.state, self.initial_randomizer.bit_generator.state, torch.get_rng_state(), torch.cuda.get_rng_state())
                     checkpoint_count += 1
+
+                self.env.wrapped_env.set_mode('train')
+                obs = self.env.reset()
+                self.multi_agent.reset()
             
 
             

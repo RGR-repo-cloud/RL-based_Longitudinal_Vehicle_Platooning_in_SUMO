@@ -295,11 +295,17 @@ class IndividualMultiAgent(MultiAgent):
         step = model_checkpoint['step']
         episode = model_checkpoint['episode']
         min_step_num = model_checkpoint['min_step_num']
+        env_randomizer_state = model_checkpoint['env_randomizer_state']
+        initial_randomizer_state = model_checkpoint['initial_randomizer_state']
       
         for agent in self.agent_ids:
             self.agents[agent].critic_optimizer.load_state_dict(model_checkpoint['optims'][agent]['critic'])
             self.agents[agent].actor_optimizer.load_state_dict(model_checkpoint['optims'][agent]['actor'])
             self.agents[agent].log_alpha_optimizer.load_state_dict(model_checkpoint['optims'][agent]['alpha'])
+
+        model_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint.pt'), map_location='cpu')
+        torch_randomizer_state = model_checkpoint['torch_randomizer_state']
+        cuda_randomizer_state = model_checkpoint['cuda_randomizer_state']
 
 
         #load replay buffer entries
@@ -330,10 +336,10 @@ class IndividualMultiAgent(MultiAgent):
 
         print("loading checkpoint " + checkpoint + " finished")
 
-        return step, episode, min_step_num
+        return step, episode, min_step_num, env_randomizer_state, initial_randomizer_state, torch_randomizer_state, cuda_randomizer_state
     
 
-    def save_checkpoint(self, dir, step, episode, min_step_num):
+    def save_checkpoint(self, dir, step, episode, min_step_num, env_randomizer_state, initial_randomizer_state, torch_randomizer_state, cuda_randomizer_state):
 
         checkpoint = 'cp_{:d}'.format(step)
 
@@ -348,6 +354,10 @@ class IndividualMultiAgent(MultiAgent):
         state['episode'] = episode
         state['min_step_num'] = min_step_num
         state['models'] = self.agents.state_dict()
+        state['env_randomizer_state'] = env_randomizer_state
+        state['initial_randomizer_state'] = initial_randomizer_state
+        state['torch_randomizer_state'] = torch_randomizer_state
+        state['cuda_randomizer_state'] = cuda_randomizer_state
         state['optims'] = {}
         
         for agent in self.agent_ids:
@@ -441,7 +451,7 @@ class SharedMultiAgent(MultiAgent):
             self.replay_buffer.add(obs[agent], actions[agent], rewards[agent], next_obs[agent], done, dones_no_max[agent])
 
 
-    def save_checkpoint(self, dir, step, episode, min_step_num):
+    def save_checkpoint(self, dir, step, episode, min_step_num, env_randomizer_state, initial_randomizer_state, torch_randomizer_state, cuda_randomizer_state):
         
         checkpoint = 'cp_{:d}'.format(step)
 
@@ -456,6 +466,10 @@ class SharedMultiAgent(MultiAgent):
         state['episode'] = episode
         state['min_step_num'] = min_step_num
         state['models'] = self.agent.state_dict()
+        state['env_randomizer_state'] = env_randomizer_state
+        state['initial_randomizer_state'] = initial_randomizer_state
+        state['torch_randomizer_state'] = torch_randomizer_state
+        state['cuda_randomizer_state'] = cuda_randomizer_state
         state['optims'] = {}
     
         state['optims'] = {}
@@ -494,10 +508,16 @@ class SharedMultiAgent(MultiAgent):
         step = model_checkpoint['step']
         episode = model_checkpoint['episode']
         min_step_num = model_checkpoint['min_step_num']
+        env_randomizer_state = model_checkpoint['env_randomizer_state']
+        initial_randomizer_state = model_checkpoint['initial_randomizer_state']
       
         self.agent.critic_optimizer.load_state_dict(model_checkpoint['optims']['critic'])
         self.agent.actor_optimizer.load_state_dict(model_checkpoint['optims']['actor'])
         self.agent.log_alpha_optimizer.load_state_dict(model_checkpoint['optims']['alpha'])
+
+        model_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint.pt'), map_location='cpu')
+        torch_randomizer_state = model_checkpoint['torch_randomizer_state']
+        cuda_randomizer_state = model_checkpoint['cuda_randomizer_state']
 
 
         #load replay buffer entries
@@ -525,7 +545,7 @@ class SharedMultiAgent(MultiAgent):
 
         print("loading checkpoint " + checkpoint + " finished")
 
-        return step, episode, min_step_num
+        return step, episode, min_step_num, env_randomizer_state, initial_randomizer_state, torch_randomizer_state, cuda_randomizer_state
             
             
 
