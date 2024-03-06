@@ -2,7 +2,7 @@
 import datetime
 from pathlib import Path
 import os
-from external_controllers.controllers import Fastbed
+from external_controllers.controllers import Fastbed, Ploeg
 
 import utils
 import hydra
@@ -23,7 +23,7 @@ class Evaluator(object):
         self.cfg = cfg
         
         #register environment
-        self.env = utils.import_flow_env(env_name=self.cfg.env, render=self.cfg.render, evaluate=False)
+        self.env = utils.import_flow_env(env_name=self.cfg.env, render=self.cfg.render, evaluate=True)
         self.agent_ids = self.env.agents
 
         self.act_range = [  float(self.env.action_space[self.agent_ids[0]].low.min()),
@@ -32,6 +32,8 @@ class Evaluator(object):
         self.controller = None
         if self.cfg.controller == "Fastbed":
             self.controller = Fastbed()
+        elif self.cfg.controller == "Ploeg":
+            self.controller = Ploeg()
         
 
     def evaluate(self):
@@ -73,6 +75,7 @@ class Evaluator(object):
             print(average_episode_rewards[agent])
         
         utils.print_accumulated_rewards(average_episode_rewards)
+        utils.log_eval_data(self.work_dir, self.env.wrapped_env.eval_state_dict, self.env.wrapped_env.eval_reward_dict, self.env.wrapped_env.eval_leader_dict, self.agent_ids)
 
     
 @hydra.main(config_path='config/external_control_eval.yaml', strict=True)

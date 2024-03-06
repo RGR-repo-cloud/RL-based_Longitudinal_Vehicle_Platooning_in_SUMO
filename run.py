@@ -42,7 +42,7 @@ class Workspace(object):
         self.device = torch.device(self.cfg.device)
         
         #register environment
-        self.env = utils.import_flow_env(env_name=self.cfg.env, render=self.cfg.render, evaluate=False)
+        self.env = utils.import_flow_env(env_name=self.cfg.env, render=self.cfg.render, evaluate=(self.cfg.mode=='eval'))
         self.agent_ids = self.env.agents
 
         #initialize loggers
@@ -149,6 +149,9 @@ class Workspace(object):
             self.loggers[agent].dump(self.step)
 
         utils.print_accumulated_rewards(average_episode_rewards)
+        
+        if self.cfg.mode == 'eval':
+            utils.log_eval_data(self.work_dir, self.env.wrapped_env.eval_state_dict, self.env.wrapped_env.eval_reward_dict, self.env.wrapped_env.eval_leader_dict, self.agent_ids)
 
 
     def train(self):

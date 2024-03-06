@@ -8,6 +8,7 @@ import os
 from collections import deque
 import random
 import math
+import pandas as pd
 
 import flow.config as config
 import sys
@@ -235,4 +236,22 @@ def print_accumulated_rewards(rewards):
     print("______________________________________")
 
 
+def log_eval_data(work_dir, eval_state_data, eval_reward_data, eval_leader_data, agent_ids):
+    
+    for agent_id in agent_ids:
+        
+        for scenario in eval_state_data[agent_id].keys():
+            file_path = work_dir  + "/" + agent_id + "-" + str(scenario) + "_eval_state_data.csv"
+            eval_data_frame = pd.DataFrame.from_dict(eval_state_data[agent_id][scenario])
+            eval_data_frame.to_csv(file_path, index=False)
+
+        for scenario in eval_reward_data[agent_id].keys():
+            file_path = work_dir  + "/" + agent_id + "-" + str(scenario) + "_eval_reward_data.csv"
+            eval_data_frame = pd.DataFrame.from_dict(eval_reward_data[agent_id][scenario])
+            eval_data_frame.to_csv(file_path, index=False)
+
+    for scenario in eval_leader_data.keys():
+        file_path = work_dir  + "/" + "leader" + "-" + str(scenario) + "_eval_leader_data.csv"
+        eval_data_frame = pd.DataFrame.from_dict(eval_leader_data[scenario])
+        eval_data_frame.to_csv(file_path, index=False)
 
