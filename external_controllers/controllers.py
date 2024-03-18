@@ -1,50 +1,79 @@
-class Fastbed(object):
+from abc import ABC, abstractmethod 
 
-    def __init__(self):
+
+class ExternalController(ABC):
+
+    @abstractmethod
+    def get_accels(self, obs):
+        pass
+
+    @abstractmethod
+    def reset_controller_state(self):
+        pass
+
+
+class Flatbed(ExternalController):
+
+    def __init__(self, veh_ids):
         self.ka = 2.4
         self.kv = 0.6
         self.kp = 12
         self.d = 5
         self.h = 4
 
+        self.veh_ids = veh_ids
 
-    def get_accel(self, obs):
+    def get_accels(self, obs):
 
-        accel_self = obs[0]
-        speed_self = obs[1]
-        speed_front = obs[2]
-        headway = obs[3]
-        speed_leader = obs[4]
+        accels = {}
+        for id in self.veh_ids:
+            accel_self = obs[id][0]
+            speed_self = obs[id][1]
+            speed_front = obs[id][2]
+            headway = obs[id][3]
+            speed_leader = obs[id][4]
 
-        return -self.ka * accel_self + self.kv * (speed_front - speed_self) + self.kp * (headway - self.d - self.h * (speed_self - speed_leader))
+            accels[id] = -self.ka * accel_self + self.kv * (speed_front - speed_self) + self.kp * (headway - self.d - self.h * (speed_self - speed_leader))
+
+        return accels
+    
     
 
-class Ploeg(object):
+class Ploeg(ExternalController):
 
-    def __init__(self):
+    def __init__(self, veh_ids):
         self.h = 1
         self.kp = 0.2
         self.kd = 0.7
-        self.TS = 1.0
+        self.TS = 0.1
 
-        self.accel = 0
+        self.veh_ids = veh_ids
 
-
-    def get_accel(self, obs):
-
-        speed_self = obs[0]
-        speed_front = obs[1]
-        accel_self = obs[2]
-        accel_front = obs[3]
-        headway = obs[4]
+        self.accels = {}
+        for id in veh_ids:
+            self.accels[id] = 0
 
 
-        self.accel += ((1 / self.h * (-self.accel + 
-                        self.kp * (headway - (2 + self.h * speed_self))+
-                        self.kd * (speed_front - speed_self - self.h * accel_self)+
-                        accel_front)) * self.TS )
+    def get_accels(self, obs):
+
+        for id in self.veh_ids:
+            speed_self = obs[id][0]
+            speed_front = obs[id][1]
+            accel_self = obs[id][2]
+            accel_front = obs[id][3]
+            headway = obs[id][4]
+
+
+            self.accels[id] += (1 / self.h * (-self.accels[id] + 
+                            self.kp * (headway - (2 + self.h * speed_self))+
+                            self.kd * (speed_front - speed_self - self.h * accel_self)+
+                            accel_front)) * self.TS 
         
-        return self.accel
+        return self.accels
+    
+    def reset_controller_state(self):
+        for id in self.veh_ids:
+            self.accels[id] = 0
 
 """
     double

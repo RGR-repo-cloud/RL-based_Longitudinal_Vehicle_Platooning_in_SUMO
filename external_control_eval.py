@@ -2,7 +2,7 @@
 import datetime
 from pathlib import Path
 import os
-from external_controllers.controllers import Fastbed, Ploeg
+from external_controllers.controllers import Flatbed, Ploeg
 
 import utils
 import hydra
@@ -30,10 +30,10 @@ class Evaluator(object):
                             float(self.env.action_space[self.agent_ids[0]].high.max())]
 
         self.controller = None
-        if self.cfg.controller == "Fastbed":
-            self.controller = Fastbed()
+        if self.cfg.controller == "Flatbed":
+            self.controller = Flatbed(self.agent_ids)
         elif self.cfg.controller == "Ploeg":
-            self.controller = Ploeg()
+            self.controller = Ploeg(self.agent_ids)
         
 
     def evaluate(self):
@@ -43,6 +43,7 @@ class Evaluator(object):
         for episode in range(self.cfg.num_eval_episodes):
             episode_step = 0
             
+            self.controller.reset_controller_state()
             self.env.wrapped_env.set_mode('eval')
             self.env.wrapped_env.set_scenario(episode % self.env.wrapped_env.env_params.additional_params['num_scenarios'])
             obs = self.env.reset()
@@ -53,10 +54,11 @@ class Evaluator(object):
                     episode_rewards[agent] = 0
 
             while not done:
+                
+                actions = self.controller.get_accels(obs)
 
-                actions = {}
                 for agent in self.agent_ids:
-                    actions[agent] = np.clip(self.controller.get_accel(obs[agent]), a_min=self.act_range[0], a_max=self.act_range[1])
+                    actions[agent] = np.clip(actions[agent], a_min=self.act_range[0], a_max=self.act_range[1])
                 
                 obs, rewards, dones, _ = self.env.step(actions)
                 
