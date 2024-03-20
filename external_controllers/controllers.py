@@ -74,18 +74,3 @@ class Ploeg(ExternalController):
     def reset_controller_state(self):
         for id in self.veh_ids:
             self.accels[id] = 0
-
-"""
-    double
-MSCFModel_CC::_ploeg(const MSVehicle* veh, double egoSpeed, double predSpeed, double predAcceleration, double gap2pred) const {
-    CC_VehicleVariables* vars = (CC_VehicleVariables*)veh->getCarFollowVariables();
-    return (1 / vars->ploegH * (
-                -vars->controllerAcceleration +
-                vars->ploegKp * (gap2pred - (2 + vars->ploegH * egoSpeed)) +
-                vars->ploegKd * (predSpeed - egoSpeed - vars->ploegH * veh->getAcceleration()) +
-                predAcceleration
-            )) * TS ;
-}
-
-ploegH(0.5), ploegKp(0.2), ploegKd(0.7)
-"""

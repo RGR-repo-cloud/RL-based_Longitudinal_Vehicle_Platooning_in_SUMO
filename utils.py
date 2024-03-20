@@ -16,21 +16,23 @@ from gym.spaces import Box
 from copy import deepcopy
 from flow.utils.registry import make_create_env
 
+
+#########################################################################
+# The following code snippet is adopted from the repository 
+# https://github.com/AboudyKreidieh/h-baselines.git and slightly modified.
+# The code snippet comprises the 'import_flow_env' function
+# and the 'FlowEnv'
+
 def import_flow_env(env_name, render, evaluate):
     
      # Add flow/examples to your path to located the below modules.
     sys.path.append(os.path.join(config.PROJECT_PATH, "examples"))
 
     # Import relevant information from the exp_config script.
-    module = __import__("exp_configs.rl.singleagent", fromlist=[env_name])
     module_ma = __import__("exp_configs.rl.multiagent", fromlist=[env_name])
 
-    # Import the sub-module containing the specified exp_config and determine
-    # whether the environment is single agent or multi-agent.
-    if hasattr(module, env_name):
-        submodule = getattr(module, env_name)
-        multiagent = False
-    elif hasattr(module_ma, env_name):
+    # Import the sub-module containing the specified exp_config
+    if hasattr(module_ma, env_name):
         submodule = getattr(module_ma, env_name)
         multiagent = True
     else:
@@ -54,7 +56,7 @@ class FlowEnv(gym.Env):
 
     def __init__(self,
                  flow_params,
-                 multiagent=False,
+                 multiagent=True,
                  render=False,
                  version=0):
         
@@ -67,17 +69,13 @@ class FlowEnv(gym.Env):
         self.wrapped_env = create_env()
         self.horizon = self.wrapped_env.env_params.horizon
 
-        # Collect the IDs of individual vehicles if using a multi-agent env.
-        if self.multiagent:
-            self.agents = list(self.wrapped_env.reset().keys())
+        # Collect the IDs of individual vehicles
+        self.agents = list(self.wrapped_env.reset().keys())
 
     @property
     def action_space(self):
         """See wrapped environment."""
-        if self.multiagent:
-            return {key: self.wrapped_env.action_space for key in self.agents}
-        else:
-            return self.wrapped_env.action_space
+        return {key: self.wrapped_env.action_space for key in self.agents}
 
     @property
     def observation_space(self):
@@ -111,6 +109,8 @@ class FlowEnv(gym.Env):
         else:
             raise ValueError("Environment does not have a query_expert method")
 
+
+#########################################################################################
 
 class eval_mode(object):
     def __init__(self, *models):
