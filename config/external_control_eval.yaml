@@ -1,0 +1,14 @@
+env: platoon_exp
+
+controller: Ploeg
+
+render: false
+
+num_eval_episodes: 6
+
+
+# hydra configuration
+hydra:
+    name: ${env}
+    run:
+        dir: ./ext_eval

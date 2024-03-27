@@ -1,0 +1,61 @@
+defaults:
+    - agent: sac
+
+env: platoon_exp
+
+# "shared" or "individual"
+multi_agent_mode: individual
+equalize_agents: true
+
+# "unilateral" or "bilateral"
+control_mode: unilateral
+
+# "train" or "eval"
+mode: train
+render: false
+
+load_checkpoint: false
+save_checkpoint: true
+checkpoint_frequency: 50000
+
+# for loading a checkpoint
+run_directory: checkpoint-directory
+checkpoint: checkpoint_name
+
+num_train_steps: 400000
+replay_buffer_capacity: 50000
+
+num_seed_steps: 600
+
+eval_frequency: 10000
+num_eval_episodes: 6
+
+fed_enabled: true
+fed_and_update: true
+fed_actor: true
+fed_critic: true
+fed_target: true
+fed_alpha: true
+fed_frequency: 1
+fed_pre_weight: 0.001
+fed_post_weight: 0.001
+fed_first_post_weight: 0.001
+fed_last_pre_weight: 0.001
+
+
+# "cuda" or "cpu"
+device: cuda
+
+# logger
+log_frequency: 600
+log_save_tb: false
+
+overall_seed: 1
+initial_seed: 1
+
+
+# hydra configuration
+hydra:
+    name: ${env}
+    run:
+        dir: ./exp

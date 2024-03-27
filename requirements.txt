@@ -1,0 +1,4 @@
+termcolor
+git+https://github.com/facebookresearch/hydra@0.11_branch
+tensorboard
+seaborn

@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-import time
 
 from agent import Agent
 import utils
@@ -36,26 +35,30 @@ class SACAgent(Agent, nn.Module):
 
         self.actor = hydra.utils.instantiate(actor_cfg).to(self.device)
 
-        self.log_alpha = torch.tensor(np.log(init_temperature)).to(self.device)
-        self.log_alpha.requires_grad = True
+        self.log_alpha = torch.nn.Parameter(torch.tensor(np.log(init_temperature)).to(self.device),requires_grad=True)
         # set target entropy to -|A|
         self.target_entropy = -action_dim
 
         # optimizers
-        self.critic_lr = critic_lr
-        self.actor_lr = actor_lr
-        self.alpha_lr = alpha_lr
-        self.actor_betas = actor_betas
-        self.critic_betas = critic_betas
-        self.alpha_betas = alpha_betas
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(),
+                                                lr=actor_lr,
+                                                betas=actor_betas)
 
-        #self.train() ##############################################################3
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(),
+                                                 lr=critic_lr,
+                                                 betas=critic_betas)
+
+        self.log_alpha_optimizer = torch.optim.Adam([self.log_alpha],
+                                                    lr=alpha_lr,
+                                                    betas=alpha_betas)
+
+        self.train()
+        self.critic_target.train()
 
     def train(self, training=True):
         self.training = training
         self.actor.train(training)
         self.critic.train(training)
-        self.critic_target.train()
 
     @property
     def alpha(self):
@@ -83,15 +86,18 @@ class SACAgent(Agent, nn.Module):
 
         # get current Q estimates
         current_Q1, current_Q2 = self.critic(obs, action)
-
         critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(
             current_Q2, target_Q)
-
         logger.log('train_critic/loss', critic_loss, step)
 
-        return critic_loss
+        # Optimize the critic
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
 
-    def update_actor(self, obs, logger, step):
+        self.critic.log(logger, step)
+
+    def update_actor_and_alpha(self, obs, logger, step):
         dist = self.actor(obs)
         action = dist.rsample()
         log_prob = dist.log_prob(action).sum(-1, keepdim=True)
@@ -104,20 +110,23 @@ class SACAgent(Agent, nn.Module):
         logger.log('train_actor/target_entropy', self.target_entropy, step)
         logger.log('train_actor/entropy', -log_prob.mean(), step)
 
-        return actor_loss, log_prob
+        # optimize the actor
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
 
-            
-    def update_alpha(self, logger, step, log_prob): #test if log_prob stays the same after backward(), loss before zero_grad()
-        
-        alpha_loss = (self.alpha *
-                        (-log_prob - self.target_entropy).detach()).mean()
-        logger.log('train_alpha/loss', alpha_loss, step)
-        logger.log('train_alpha/value', self.alpha, step)
+        self.actor.log(logger, step)
 
-        return alpha_loss
+        if self.learnable_temperature:
+            self.log_alpha_optimizer.zero_grad()
+            alpha_loss = (self.alpha *
+                          (-log_prob - self.target_entropy).detach()).mean()
+            logger.log('train_alpha/loss', alpha_loss, step)
+            logger.log('train_alpha/value', self.alpha, step)
+            alpha_loss.backward()
+            self.log_alpha_optimizer.step()
 
 
-    """
     def update(self, replay_buffer, logger, step):
         obs, action, reward, next_obs, not_done, not_done_no_max = replay_buffer.sample(
             self.batch_size)
@@ -128,11 +137,8 @@ class SACAgent(Agent, nn.Module):
                            logger, step)
 
         if step % self.actor_update_frequency == 0:
-            self.update_actor(obs, logger, step)
-            if self.learnable_temperature:
-                self.update_alpha(logger, step)
+            self.update_actor_and_alpha(obs, logger, step)
 
         if step % self.critic_target_update_frequency == 0:
             utils.soft_update_params(self.critic, self.critic_target,
                                      self.critic_tau)
-    """
