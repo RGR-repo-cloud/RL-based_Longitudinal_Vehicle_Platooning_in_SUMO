@@ -8,25 +8,26 @@ multi_agent_mode: individual
 equalize_agents: true
 
 # "unilateral" or "bilateral"
-control_mode: bilateral
+control_mode: unilateral
 
 # "train" or "eval"
 mode: train
 render: false
 
 load_checkpoint: false
-save_checkpoint: false
-checkpoint_frequency: 1000
+save_checkpoint: true
+checkpoint_frequency: 50000
 
-run_directory: 2024-02-24/11-17
-checkpoint: cp_1011
+# for loading a checkpoint
+run_directory: checkpoint-directory
+checkpoint: checkpoint_name
 
-num_train_steps: 6000
-replay_buffer_capacity: 50000 #${num_train_steps}
+num_train_steps: 400000
+replay_buffer_capacity: 50000
 
 num_seed_steps: 600
 
-eval_frequency: 1000
+eval_frequency: 10000
 num_eval_episodes: 6
 
 fed_enabled: true
@@ -36,10 +37,10 @@ fed_critic: true
 fed_target: true
 fed_alpha: true
 fed_frequency: 1
-fed_pre_weight: 0.33
-fed_post_weight: 0.33
-fed_first_post_weight: 0.33
-fed_last_pre_weight: 0.33
+fed_pre_weight: 0.001
+fed_post_weight: 0.001
+fed_first_post_weight: 0.001
+fed_last_pre_weight: 0.001
 
 
 # "cuda" or "cpu"
@@ -47,7 +48,7 @@ device: cuda
 
 # logger
 log_frequency: 600
-log_save_tb: true
+log_save_tb: false
 
 overall_seed: 1
 initial_seed: 1

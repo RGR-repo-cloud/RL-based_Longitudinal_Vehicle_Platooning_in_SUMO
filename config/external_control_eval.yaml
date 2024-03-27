@@ -1,6 +1,6 @@
 env: platoon_exp
 
-controller: Fastbed
+controller: Ploeg
 
 render: false
 
