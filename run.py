@@ -105,7 +105,7 @@ class Workspace(object):
             
             self.env.wrapped_env.load_randomizer_state(env_randomizer_state)
             self.initial_randomizer.bit_generator.state = initial_randomizer_state
-            utils.load_randomizer_states(torch_randomizer_state, cuda_randomizer_state)
+            utils.load_randomizer_states(torch_randomizer_state, cuda_randomizer_state, cuda_available = (not self.cfg.device == 'cpu'))
         
 
 
@@ -251,7 +251,7 @@ class Workspace(object):
                 #save models and optimizers
                 if self.cfg.save_checkpoint and int(virtual_session_step / self.cfg.checkpoint_frequency) > checkpoint_count:
                     self.min_step_num += self.cfg.checkpoint_frequency
-                    self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step, self.episode, self.min_step_num, self.env.wrapped_env.episode_randomizer.bit_generator.state, self.initial_randomizer.bit_generator.state, torch.get_rng_state(), torch.cuda.get_rng_state())
+                    self.multi_agent.save_checkpoint(os.path.join(os.getcwd(), 'checkpoints'), self.step, self.episode, self.min_step_num, self.env.wrapped_env.episode_randomizer.bit_generator.state, self.initial_randomizer.bit_generator.state, torch.get_rng_state(), torch.cuda.get_rng_state() if not self.cfg.device == 'cpu' else 0)
                     checkpoint_count += 1
 
                 self.env.wrapped_env.set_mode('train')

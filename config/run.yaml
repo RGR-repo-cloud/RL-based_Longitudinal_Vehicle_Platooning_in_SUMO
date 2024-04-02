@@ -19,8 +19,8 @@ save_checkpoint: true
 checkpoint_frequency: 50000
 
 # for loading a checkpoint
-run_directory: checkpoint-directory
-checkpoint: checkpoint_name
+run_directory: 2000-01-01/00-00/
+checkpoint: cp_1000000
 
 num_train_steps: 400000
 replay_buffer_capacity: 50000

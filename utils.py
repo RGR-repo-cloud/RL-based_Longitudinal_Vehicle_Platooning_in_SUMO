@@ -158,9 +158,10 @@ def set_seed_everywhere(seed):
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
 
-def load_randomizer_states(torch_randomizer_state, cuda_randomizer_state):
+def load_randomizer_states(torch_randomizer_state, cuda_randomizer_state, cuda_available):
     torch.set_rng_state(torch_randomizer_state)
-    torch.cuda.set_rng_state(cuda_randomizer_state)
+    if cuda_available:
+        torch.cuda.set_rng_state(cuda_randomizer_state)
     
 def make_dir(*path_parts):
     dir_path = os.path.join(*path_parts)
